@@ -4,3 +4,15 @@ SELECT
     se.state_id
 FROM dbo.states s
 INNER JOIN dbo.state_entities se ON s.state_id = se.state_id
+
+
+
+SELECT 
+    w.work_id,
+    w.work_name,
+    sw.stage_work_description,
+    COUNT(*) AS cantidad_duplicados
+FROM dbo.stage_works sw
+INNER JOIN dbo.works w ON sw.work_id = w.work_id
+GROUP BY w.work_id, w.work_name, sw.stage_work_description
+HAVING COUNT(*) > 1
