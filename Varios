@@ -1,23 +1,10 @@
-¡Ahí está el bug! El problema está en state_entities, no en stage_works. Alguien insertó dos registros de "Certificación" para la entidad "Stage".
-Verificá los duplicados en state_entities:
 SELECT 
     se.state_entity_id,
-    e.entity_name,
-    s.state_name
-FROM dbo.state_entities se
-INNER JOIN dbo.entities e ON e.entity_id = se.entity_id
-INNER JOIN dbo.states s ON se.state_id = s.state_id
-WHERE e.entity_name = 'Stage'
-ORDER BY s.state_name
-Esto te mostrará los dos registros de "Certificación" con diferentes state_entity_id. El problema es que cuando se crean los stage_works, el sistema está usando ambos state_entity_id de Certificación.
-Para encontrar cuál es el duplicado:
-SELECT 
     s.state_name,
-    COUNT(*) AS cantidad
+    COUNT(sw.stage_work_id) AS stage_works_asociados
 FROM dbo.state_entities se
 INNER JOIN dbo.entities e ON e.entity_id = se.entity_id
 INNER JOIN dbo.states s ON se.state_id = s.state_id
-WHERE e.entity_name = 'Stage'
-GROUP BY s.state_name
-HAVING COUNT(*) > 1
-El fix real sería eliminar el state_entity_id duplicado de state_entities (y los stage_works que lo usan), no solo los stage_works. ¿Querés que armemos ese script?
+LEFT JOIN dbo.stage_works sw ON se.state_entity_id = sw.state_entity_id
+WHERE e.entity_name = 'Stage' AND s.state_name = 'Certificación'
+GROUP BY se.state_entity_id, s.state_name
