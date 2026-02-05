@@ -17,3 +17,26 @@ WHERE state_entity_id = 'FA8F1EF4-6AE0-4EEB-AD9B-AE8E3BC34C07'
 2. Eliminar el state_entity duplicado:
 DELETE FROM dbo.state_entities
 WHERE state_entity_id = 'FA8F1EF4-6AE0-4EEB-AD9B-AE8E3BC34C07'
+
+
+
+-- 1. Task_users
+DELETE tu
+FROM dbo.task_users tu
+INNER JOIN dbo.tasks t ON tu.task_id = t.task_id
+INNER JOIN dbo.stage_works sw ON t.stage_work_id = sw.stage_work_id
+WHERE sw.state_entity_id = 'FA8F1EF4-6AE0-4EEB-AD9B-AE8E3BC34C07'
+
+-- 2. Tasks
+DELETE t
+FROM dbo.tasks t
+INNER JOIN dbo.stage_works sw ON t.stage_work_id = sw.stage_work_id
+WHERE sw.state_entity_id = 'FA8F1EF4-6AE0-4EEB-AD9B-AE8E3BC34C07'
+
+-- 3. Stage_works
+DELETE FROM dbo.stage_works
+WHERE state_entity_id = 'FA8F1EF4-6AE0-4EEB-AD9B-AE8E3BC34C07'
+
+-- 4. State_entity duplicado
+DELETE FROM dbo.state_entities
+WHERE state_entity_id = 'FA8F1EF4-6AE0-4EEB-AD9B-AE8E3BC34C07'
