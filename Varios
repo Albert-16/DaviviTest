@@ -1,57 +1,23 @@
-u1. Stage_works duplicados por work (el que ya encontraste):
-SELECT work_id, stage_work_description, COUNT(*) AS duplicados
-FROM dbo.stage_works
-GROUP BY work_id, stage_work_description
-HAVING COUNT(*) > 1
-2. Stage_works huérfanos (sin work asociado):
-SELECT sw.* 
-FROM dbo.stage_works sw
-LEFT JOIN dbo.works w ON sw.work_id = w.work_id
-WHERE w.work_id IS NULL
-3. Stage_works con state_entity_id inválido:
-SELECT sw.* 
-FROM dbo.stage_works sw
-LEFT JOIN dbo.state_entities se ON sw.state_entity_id = se.state_entity_id
-WHERE se.state_entity_id IS NULL
-4. Works huérfanos (sin state_entity válido):
-SELECT w.* 
-FROM dbo.works w
-LEFT JOIN dbo.state_entities se ON w.state_entity_id = se.state_entity_id
-WHERE se.state_entity_id IS NULL
-5. State_entities huérfanos (sin state válido):
-SELECT se.* 
+¡Ahí está el bug! El problema está en state_entities, no en stage_works. Alguien insertó dos registros de "Certificación" para la entidad "Stage".
+Verificá los duplicados en state_entities:
+SELECT 
+    se.state_entity_id,
+    e.entity_name,
+    s.state_name
 FROM dbo.state_entities se
-LEFT JOIN dbo.states s ON se.state_id = s.state_id
-WHERE s.state_id IS NULL
-6. Comparar cantidad de etapas entre producción y desarrollo:
+INNER JOIN dbo.entities e ON e.entity_id = se.entity_id
+INNER JOIN dbo.states s ON se.state_id = s.state_id
+WHERE e.entity_name = 'Stage'
+ORDER BY s.state_name
+Esto te mostrará los dos registros de "Certificación" con diferentes state_entity_id. El problema es que cuando se crean los stage_works, el sistema está usando ambos state_entity_id de Certificación.
+Para encontrar cuál es el duplicado:
 SELECT 
-    w.work_name,
-    COUNT(sw.stage_work_id) AS cantidad_etapas
-FROM dbo.works w
-LEFT JOIN dbo.stage_works sw ON w.work_id = sw.work_id
-GROUP BY w.work_id, w.work_name
-ORDER BY cantidad_etapas DESC
-
-
-
-
-Works con menos de 4 etapas (faltan etapas):
-SELECT 
-    w.work_id,
-    w.work_name,
-    COUNT(sw.stage_work_id) AS cantidad_etapas,
-    STRING_AGG(sw.stage_work_description, ', ') AS etapas
-FROM dbo.works w
-LEFT JOIN dbo.stage_works sw ON w.work_id = sw.work_id
-GROUP BY w.work_id, w.work_name
-HAVING COUNT(sw.stage_work_id) < 4
-Works con más de 4 etapas (duplicados):
-SELECT 
-    w.work_id,
-    w.work_name,
-    COUNT(sw.stage_work_id) AS cantidad_etapas,
-    STRING_AGG(sw.stage_work_description, ', ') AS etapas
-FROM dbo.works w
-LEFT JOIN dbo.stage_works sw ON w.work_id = sw.work_id
-GROUP BY w.work_id, w.work_name
-HAVING COUNT(sw.stage_work_id) > 4
+    s.state_name,
+    COUNT(*) AS cantidad
+FROM dbo.state_entities se
+INNER JOIN dbo.entities e ON e.entity_id = se.entity_id
+INNER JOIN dbo.states s ON se.state_id = s.state_id
+WHERE e.entity_name = 'Stage'
+GROUP BY s.state_name
+HAVING COUNT(*) > 1
+El fix real sería eliminar el state_entity_id duplicado de state_entities (y los stage_works que lo usan), no solo los stage_works. ¿Querés que armemos ese script?
