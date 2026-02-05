@@ -1,18 +1,33 @@
-SELECT 
-    s.state_name,
-    se.state_entity_id,
-    se.state_id
-FROM dbo.states s
-INNER JOIN dbo.state_entities se ON s.state_id = se.state_id
-
-
-
-SELECT 
-    w.work_id,
-    w.work_name,
-    sw.stage_work_description,
-    COUNT(*) AS cantidad_duplicados
-FROM dbo.stage_works sw
-INNER JOIN dbo.works w ON sw.work_id = w.work_id
-GROUP BY w.work_id, w.work_name, sw.stage_work_description
+1. Stage_works duplicados por work (el que ya encontraste):
+SELECT work_id, stage_work_description, COUNT(*) AS duplicados
+FROM dbo.stage_works
+GROUP BY work_id, stage_work_description
 HAVING COUNT(*) > 1
+2. Stage_works huérfanos (sin work asociado):
+SELECT sw.* 
+FROM dbo.stage_works sw
+LEFT JOIN dbo.works w ON sw.work_id = w.work_id
+WHERE w.work_id IS NULL
+3. Stage_works con state_entity_id inválido:
+SELECT sw.* 
+FROM dbo.stage_works sw
+LEFT JOIN dbo.state_entities se ON sw.state_entity_id = se.state_entity_id
+WHERE se.state_entity_id IS NULL
+4. Works huérfanos (sin state_entity válido):
+SELECT w.* 
+FROM dbo.works w
+LEFT JOIN dbo.state_entities se ON w.state_entity_id = se.state_entity_id
+WHERE se.state_entity_id IS NULL
+5. State_entities huérfanos (sin state válido):
+SELECT se.* 
+FROM dbo.state_entities se
+LEFT JOIN dbo.states s ON se.state_id = s.state_id
+WHERE s.state_id IS NULL
+6. Comparar cantidad de etapas entre producción y desarrollo:
+SELECT 
+    w.work_name,
+    COUNT(sw.stage_work_id) AS cantidad_etapas
+FROM dbo.works w
+LEFT JOIN dbo.stage_works sw ON w.work_id = sw.work_id
+GROUP BY w.work_id, w.work_name
+ORDER BY cantidad_etapas DESC
