@@ -1,0 +1,6 @@
+SELECT 
+    s.state_name,
+    se.state_entity_id,
+    se.state_id
+FROM dbo.states s
+INNER JOIN dbo.state_entities se ON s.state_id = se.state_id
