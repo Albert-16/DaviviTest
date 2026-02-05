@@ -1,4 +1,4 @@
-1. Stage_works duplicados por work (el que ya encontraste):
+u1. Stage_works duplicados por work (el que ya encontraste):
 SELECT work_id, stage_work_description, COUNT(*) AS duplicados
 FROM dbo.stage_works
 GROUP BY work_id, stage_work_description
@@ -31,3 +31,27 @@ FROM dbo.works w
 LEFT JOIN dbo.stage_works sw ON w.work_id = sw.work_id
 GROUP BY w.work_id, w.work_name
 ORDER BY cantidad_etapas DESC
+
+
+
+
+Works con menos de 4 etapas (faltan etapas):
+SELECT 
+    w.work_id,
+    w.work_name,
+    COUNT(sw.stage_work_id) AS cantidad_etapas,
+    STRING_AGG(sw.stage_work_description, ', ') AS etapas
+FROM dbo.works w
+LEFT JOIN dbo.stage_works sw ON w.work_id = sw.work_id
+GROUP BY w.work_id, w.work_name
+HAVING COUNT(sw.stage_work_id) < 4
+Works con más de 4 etapas (duplicados):
+SELECT 
+    w.work_id,
+    w.work_name,
+    COUNT(sw.stage_work_id) AS cantidad_etapas,
+    STRING_AGG(sw.stage_work_description, ', ') AS etapas
+FROM dbo.works w
+LEFT JOIN dbo.stage_works sw ON w.work_id = sw.work_id
+GROUP BY w.work_id, w.work_name
+HAVING COUNT(sw.stage_work_id) > 4
