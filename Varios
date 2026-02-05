@@ -8,3 +8,12 @@ INNER JOIN dbo.states s ON se.state_id = s.state_id
 LEFT JOIN dbo.stage_works sw ON se.state_entity_id = sw.state_entity_id
 WHERE e.entity_name = 'Stage' AND s.state_name = 'Certificación'
 GROUP BY se.state_entity_id, s.state_name
+
+
+
+
+DELETE FROM dbo.stage_works
+WHERE state_entity_id = 'FA8F1EF4-6AE0-4EEB-AD9B-AE8E3BC34C07'
+2. Eliminar el state_entity duplicado:
+DELETE FROM dbo.state_entities
+WHERE state_entity_id = 'FA8F1EF4-6AE0-4EEB-AD9B-AE8E3BC34C07'
