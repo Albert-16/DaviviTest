@@ -1,42 +1,781 @@
-SELECT 
-    se.state_entity_id,
-    s.state_name,
-    COUNT(sw.stage_work_id) AS stage_works_asociados
-FROM dbo.state_entities se
-INNER JOIN dbo.entities e ON e.entity_id = se.entity_id
-INNER JOIN dbo.states s ON se.state_id = s.state_id
-LEFT JOIN dbo.stage_works sw ON se.state_entity_id = sw.state_entity_id
-WHERE e.entity_name = 'Stage' AND s.state_name = 'Certificación'
-GROUP BY se.state_entity_id, s.state_name
+PaginatedResultDto----------------------------------------------------------------------------------------------------------------------------------
+
+/// <summary>
+/// DTO para resultados de inserción masiva
+/// </summary>
+public record BulkInsertResultDto<T>
+{
+    public IEnumerable<T> InsertedItems { get; init; } = Enumerable.Empty<T>();
+    public int TotalRequested { get; init; }
+    public int TotalInserted { get; init; }
+    public int TotalFailed { get; init; }
+    public bool Success { get; init; }
+    public string? ErrorMessage { get; init; }
+    public IEnumerable<BulkInsertError> Errors { get; init; } = Enumerable.Empty<BulkInsertError>();
+}
+
+/// <summary>
+/// Error individual en inserción masiva
+/// </summary>
+public record BulkInsertError
+{
+    public int Index { get; init; }
+    public string ErrorMessage { get; init; } = string.Empty;
+    public object? FailedItem { get; init; }
+}
+
+
+
+LogMicroserviceService------------------------------------------------------------------------------------------------------------------------
+
+    public async Task<BulkInsertResultDto<LogMicroserviceDto>> CreateBulkAsync(
+        IEnumerable<CreateLogMicroserviceDto> dtos,
+        CancellationToken cancellationToken = default)
+    {
+        var dtoList = dtos.ToList();
+
+        if (dtoList.Count == 0)
+        {
+            return new BulkInsertResultDto<LogMicroserviceDto>
+            {
+                TotalRequested = 0,
+                TotalInserted = 0,
+                Success = true
+            };
+        }
+
+        if (dtoList.Count > 1000)
+        {
+            return new BulkInsertResultDto<LogMicroserviceDto>
+            {
+                TotalRequested = dtoList.Count,
+                TotalInserted = 0,
+                Success = false,
+                ErrorMessage = "El límite máximo por lote es de 1000 registros."
+            };
+        }
+
+        // Validar cada registro y separar válidos de inválidos
+        var validDtos = new List<CreateLogMicroserviceDto>();
+        var errors = new List<BulkInsertError>();
+
+        for (int i = 0; i < dtoList.Count; i++)
+        {
+            var dto = dtoList[i];
+            var validationError = ValidateLogMicroservice(dto);
+            if (validationError != null)
+            {
+                errors.Add(new BulkInsertError
+                {
+                    Index = i,
+                    ErrorMessage = validationError,
+                    FailedItem = dto
+                });
+            }
+            else
+            {
+                validDtos.Add(dto);
+            }
+        }
+
+        if (validDtos.Count == 0)
+        {
+            return new BulkInsertResultDto<LogMicroserviceDto>
+            {
+                TotalRequested = dtoList.Count,
+                TotalInserted = 0,
+                TotalFailed = errors.Count,
+                Success = false,
+                ErrorMessage = "Ningún registro pasó la validación.",
+                Errors = errors
+            };
+        }
+
+        var entities = _mapper.Map<List<LogMicroservice>>(validDtos);
+        var strategy = _context.Database.CreateExecutionStrategy();
+
+        try
+        {
+            var results = await strategy.ExecuteAsync(async ct =>
+            {
+                using var transaction = await _context.Database.BeginTransactionAsync(ct);
+                await _context.LogMicroservices.AddRangeAsync(entities, ct);
+                await _context.SaveChangesAsync(ct);
+                await transaction.CommitAsync(ct);
+                return _mapper.Map<List<LogMicroserviceDto>>(entities);
+            }, cancellationToken);
+
+            // Publicar eventos en background (fire-and-forget)
+            _ = Task.Run(async () =>
+            {
+                foreach (var result in results)
+                {
+                    try
+                    {
+                        await _eventPublisher.PublishLogMicroserviceCreatedAsync(new LogMicroserviceCreatedEvent
+                        {
+                            LogId = result.LogId,
+                            LogDate = result.LogDate,
+                            LogLevel = result.LogLevel,
+                            LogMicroserviceText = result.LogMicroserviceText,
+                            CreatedAt = DateTime.UtcNow
+                        });
+                    }
+                    catch { /* Log silencioso - no bloquea respuesta */ }
+                }
+            }, CancellationToken.None);
+
+            return new BulkInsertResultDto<LogMicroserviceDto>
+            {
+                InsertedItems = results,
+                TotalRequested = dtoList.Count,
+                TotalInserted = results.Count,
+                TotalFailed = errors.Count,
+                Success = true,
+                Errors = errors
+            };
+        }
+        catch (Exception ex)
+        {
+            return new BulkInsertResultDto<LogMicroserviceDto>
+            {
+                TotalRequested = dtoList.Count,
+                TotalInserted = 0,
+                TotalFailed = dtoList.Count,
+                Success = false,
+                ErrorMessage = ex.Message,
+                Errors = errors
+            };
+        }
+    }
+
+    private static string? ValidateLogMicroservice(CreateLogMicroserviceDto dto)
+    {
+        if (dto.LogId <= 0)
+            return "LogId debe ser mayor a 0.";
+        return null;
+    }
 
 
 
 
-DELETE FROM dbo.stage_works
-WHERE state_entity_id = 'FA8F1EF4-6AE0-4EEB-AD9B-AE8E3BC34C07'
-2. Eliminar el state_entity duplicado:
-DELETE FROM dbo.state_entities
-WHERE state_entity_id = 'FA8F1EF4-6AE0-4EEB-AD9B-AE8E3BC34C07'
+
+
+LogServiceHeaderService---------------------------------------------------------------------------------------
+
+    public async Task<BulkInsertResultDto<LogServicesHeaderDto>> CreateBulkAsync(
+        IEnumerable<CreateLogServicesHeaderDto> dtos,
+        CancellationToken cancellationToken = default)
+    {
+        var dtoList = dtos.ToList();
+
+        if (dtoList.Count == 0)
+        {
+            return new BulkInsertResultDto<LogServicesHeaderDto>
+            {
+                TotalRequested = 0,
+                TotalInserted = 0,
+                Success = true
+            };
+        }
+
+        if (dtoList.Count > 1000)
+        {
+            return new BulkInsertResultDto<LogServicesHeaderDto>
+            {
+                TotalRequested = dtoList.Count,
+                TotalInserted = 0,
+                Success = false,
+                ErrorMessage = "El límite máximo por lote es de 1000 registros."
+            };
+        }
+
+        // Validar cada registro y separar válidos de inválidos
+        var validDtos = new List<CreateLogServicesHeaderDto>();
+        var errors = new List<BulkInsertError>();
+
+        for (int i = 0; i < dtoList.Count; i++)
+        {
+            var dto = dtoList[i];
+            var validationError = ValidateLogServicesHeader(dto);
+            if (validationError != null)
+            {
+                errors.Add(new BulkInsertError
+                {
+                    Index = i,
+                    ErrorMessage = validationError,
+                    FailedItem = dto
+                });
+            }
+            else
+            {
+                validDtos.Add(dto);
+            }
+        }
+
+        // Si no hay registros válidos, retornar solo los errores
+        if (validDtos.Count == 0)
+        {
+            return new BulkInsertResultDto<LogServicesHeaderDto>
+            {
+                TotalRequested = dtoList.Count,
+                TotalInserted = 0,
+                TotalFailed = errors.Count,
+                Success = false,
+                ErrorMessage = "Ningún registro pasó la validación.",
+                Errors = errors
+            };
+        }
+
+        var entities = _mapper.Map<List<LogServicesHeader>>(validDtos);
+        var strategy = _context.Database.CreateExecutionStrategy();
+
+        try
+        {
+            var results = await strategy.ExecuteAsync(async ct =>
+            {
+                using var transaction = await _context.Database.BeginTransactionAsync(ct);
+                await _context.LogServicesHeaders.AddRangeAsync(entities, ct);
+                await _context.SaveChangesAsync(ct);
+                await transaction.CommitAsync(ct);
+                return _mapper.Map<List<LogServicesHeaderDto>>(entities);
+            }, cancellationToken);
+
+            // Publicar eventos en background (fire-and-forget)
+            _ = Task.Run(async () =>
+            {
+                foreach (var entity in entities)
+                {
+                    try
+                    {
+                        await _eventPublisher.PublishLogCreatedAsync(new LogCreatedEvent
+                        {
+                            LogId = entity.LogId,
+                            LogDateIn = entity.LogDateIn,
+                            LogDateOut = entity.LogDateOut,
+                            LogState = entity.LogState,
+                            LogMethodUrl = entity.LogMethodUrl,
+                            LogMethodName = entity.LogMethodName,
+                            LogFsId = entity.LogFsId,
+                            MethodDescription = entity.MethodDescription,
+                            TciIpPort = entity.TciIpPort,
+                            ErrorCode = entity.ErrorCode,
+                            ErrorDescription = entity.ErrorDescription,
+                            IpFs = entity.IpFs,
+                            TypeProcess = entity.TypeProcess,
+                            LogNodo = entity.LogNodo,
+                            HttpMethod = entity.HttpMethod,
+                            MicroserviceName = entity.MicroserviceName,
+                            RequestDuration = entity.RequestDuration,
+                            TransactionId = entity.TransactionId,
+                            UserId = entity.UserId,
+                            SessionId = entity.SessionId,
+                            RequestId = entity.RequestId,
+                            CreatedAt = DateTime.UtcNow
+                        });
+                    }
+                    catch { /* Log silencioso - no bloquea respuesta */ }
+                }
+            }, CancellationToken.None);
+
+            return new BulkInsertResultDto<LogServicesHeaderDto>
+            {
+                InsertedItems = results,
+                TotalRequested = dtoList.Count,
+                TotalInserted = results.Count,
+                TotalFailed = errors.Count,
+                Success = true,
+                Errors = errors
+            };
+        }
+        catch (Exception ex)
+        {
+            return new BulkInsertResultDto<LogServicesHeaderDto>
+            {
+                TotalRequested = dtoList.Count,
+                TotalInserted = 0,
+                TotalFailed = dtoList.Count,
+                Success = false,
+                ErrorMessage = ex.Message,
+                Errors = errors
+            };
+        }
+    }
+
+    private static string? ValidateLogServicesHeader(CreateLogServicesHeaderDto dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.LogMethodUrl))
+            return "LogMethodUrl es requerido.";
+        if (dto.LogDateIn == default)
+            return "LogDateIn es requerido.";
+        if (dto.LogDateOut == default)
+            return "LogDateOut es requerido.";
+        if (dto.LogDateOut < dto.LogDateIn)
+            return "LogDateOut no puede ser anterior a LogDateIn.";
+        return null;
+    }
 
 
 
--- 1. Task_users
-DELETE tu
-FROM dbo.task_users tu
-INNER JOIN dbo.tasks t ON tu.task_id = t.task_id
-INNER JOIN dbo.stage_works sw ON t.stage_work_id = sw.stage_work_id
-WHERE sw.state_entity_id = 'FA8F1EF4-6AE0-4EEB-AD9B-AE8E3BC34C07'
+LogServiceMutation---------------------------------------------------------------------------------------------------
+   /// <summary>
+   /// Crea múltiples logs de servicios en una sola operación
+   /// </summary>
+   [GraphQLDescription("Crea múltiples logs de servicios en una sola operación atómica en FastServer_Logs (PostgreSQL)")]
+   public async Task<BulkInsertResultDto<LogServicesHeaderDto>> BulkCreateLogServicesHeader(
+       [Service] ILogServicesHeaderService service,
+       [GraphQLDescription("Datos de los logs a crear")] BulkCreateLogServicesHeaderInput input,
+       CancellationToken cancellationToken = default)
+   {
+       var dtos = input.Items.Select(i => new CreateLogServicesHeaderDto
+       {
+           LogDateIn = i.LogDateIn,
+           LogDateOut = i.LogDateOut,
+           LogState = i.LogState,
+           LogMethodUrl = i.LogMethodUrl,
+           LogMethodName = i.LogMethodName,
+           LogFsId = i.LogFsId,
+           MethodDescription = i.MethodDescription,
+           TciIpPort = i.TciIpPort,
+           ErrorCode = i.ErrorCode,
+           ErrorDescription = i.ErrorDescription,
+           IpFs = i.IpFs,
+           TypeProcess = i.TypeProcess,
+           LogNodo = i.LogNodo,
+           HttpMethod = i.HttpMethod,
+           MicroserviceName = i.MicroserviceName,
+           RequestDuration = i.RequestDuration,
+           TransactionId = i.TransactionId,
+           UserId = i.UserId,
+           SessionId = i.SessionId,
+           RequestId = i.RequestId
+       });
 
--- 2. Tasks
-DELETE t
-FROM dbo.tasks t
-INNER JOIN dbo.stage_works sw ON t.stage_work_id = sw.stage_work_id
-WHERE sw.state_entity_id = 'FA8F1EF4-6AE0-4EEB-AD9B-AE8E3BC34C07'
+       return await service.CreateBulkAsync(dtos, cancellationToken);
+   }
 
--- 3. Stage_works
-DELETE FROM dbo.stage_works
-WHERE state_entity_id = 'FA8F1EF4-6AE0-4EEB-AD9B-AE8E3BC34C07'
 
--- 4. State_entity duplicado
-DELETE FROM dbo.state_entities
-WHERE state_entity_id = 'FA8F1EF4-6AE0-4EEB-AD9B-AE8E3BC34C07'
+
+
+    /// <summary>
+    /// Crea múltiples logs de microservicio en una sola operación
+    /// </summary>
+    [GraphQLDescription("Crea múltiples logs de microservicio en una sola operación en FastServer_Logs (PostgreSQL)")]
+    public async Task<BulkInsertResultDto<LogMicroserviceDto>> BulkCreateLogMicroservice(
+        [Service] ILogMicroserviceService service,
+        [GraphQLDescription("Datos de los logs a crear")] BulkCreateLogMicroserviceInput input,
+        CancellationToken cancellationToken = default)
+    {
+        var dtos = input.Items.Select(i => new CreateLogMicroserviceDto
+        {
+            LogId = i.LogId,
+            LogDate = i.LogDate,
+            LogLevel = i.LogLevel,
+            LogMicroserviceText = i.LogMicroserviceText
+        });
+
+        return await service.CreateBulkAsync(dtos, cancellationToken);
+    }
+
+
+
+
+
+Microservice Mutation----------------------------------------------------------------------------------------------
+using FastServer.Application.DTOs.Microservices;
+using FastServer.Application.Services.Microservices;
+using FastServer.GraphQL.Api.GraphQL.Mutations;
+using HotChocolate;
+using HotChocolate.Types;
+
+namespace FastServer.GraphQL.Api.GraphQL.Mutations;
+
+[ExtendObjectType<Mutation>]
+public class MicroservicesMutation
+{
+    // ========================================
+    // MICROSERVICE REGISTERS - MUTATIONS
+    // ========================================
+
+    [GraphQLDescription("Crea un nuevo registro de microservicio en el sistema")]
+    public async Task<MicroserviceRegisterDto> CreateMicroserviceAsync(
+        [Service] MicroserviceRegisterService service,
+        [GraphQLDescription("ID del cluster al que pertenece el microservicio")] long? clusterId,
+        [GraphQLDescription("Nombre del microservicio")] string? name,
+        [GraphQLDescription("Indica si el microservicio está activo (por defecto: true)")] bool active = true,
+        [GraphQLDescription("Indica si tiene conexión al Core (por defecto: false)")] bool coreConnection = false,
+        CancellationToken cancellationToken = default)
+    {
+        return await service.CreateAsync(clusterId, name, active, coreConnection, cancellationToken);
+    }
+
+    [GraphQLDescription("Actualiza un registro de microservicio existente. Solo se modifican los campos proporcionados")]
+    public async Task<MicroserviceRegisterDto?> UpdateMicroserviceAsync(
+        [Service] MicroserviceRegisterService service,
+        [GraphQLDescription("ID del microservicio a actualizar")] long id,
+        [GraphQLDescription("Nuevo ID de cluster (opcional)")] long? clusterId = null,
+        [GraphQLDescription("Nuevo nombre del microservicio (opcional)")] string? name = null,
+        [GraphQLDescription("Nuevo estado activo/inactivo (opcional)")] bool? active = null,
+        [GraphQLDescription("Nueva conexión al Core (opcional)")] bool? coreConnection = null,
+        CancellationToken cancellationToken = default)
+    {
+        return await service.UpdateAsync(id, clusterId, name, active, coreConnection, cancellationToken);
+    }
+
+    [GraphQLDescription("Elimina lógicamente un microservicio (soft delete). Retorna true si se eliminó correctamente")]
+    public async Task<bool> SoftDeleteMicroserviceAsync(
+        [Service] MicroserviceRegisterService service,
+        [GraphQLDescription("ID del microservicio a eliminar")] long id,
+        CancellationToken cancellationToken = default)
+    {
+        return await service.SoftDeleteAsync(id, cancellationToken);
+    }
+
+    [GraphQLDescription("Activa o desactiva un microservicio. Retorna true si se actualizó correctamente")]
+    public async Task<bool> SetMicroserviceActiveAsync(
+        [Service] MicroserviceRegisterService service,
+        [GraphQLDescription("ID del microservicio")] long id,
+        [GraphQLDescription("true para activar, false para desactivar")] bool active,
+        CancellationToken cancellationToken = default)
+    {
+        return await service.SetActiveAsync(id, active, cancellationToken);
+    }
+
+    // ========================================
+    // CLUSTERS - MUTATIONS
+    // ========================================
+
+    [GraphQLDescription("Crea un nuevo cluster de microservicios")]
+    public async Task<MicroservicesClusterDto> CreateClusterAsync(
+        [Service] MicroservicesClusterService service,
+        [GraphQLDescription("Nombre del cluster")] string? name,
+        [GraphQLDescription("Nombre del servidor (opcional)")] string? serverName = null,
+        [GraphQLDescription("Dirección IP del servidor (opcional)")] string? serverIp = null,
+        [GraphQLDescription("Indica si el cluster está activo (por defecto: true)")] bool active = true,
+        CancellationToken cancellationToken = default)
+    {
+        return await service.CreateAsync(name, serverName, serverIp, active, cancellationToken);
+    }
+
+    [GraphQLDescription("Actualiza un cluster existente. Solo se modifican los campos proporcionados")]
+    public async Task<MicroservicesClusterDto?> UpdateClusterAsync(
+        [Service] MicroservicesClusterService service,
+        [GraphQLDescription("ID del cluster a actualizar")] long id,
+        [GraphQLDescription("Nuevo nombre del cluster (opcional)")] string? name = null,
+        [GraphQLDescription("Nuevo nombre del servidor (opcional)")] string? serverName = null,
+        [GraphQLDescription("Nueva IP del servidor (opcional)")] string? serverIp = null,
+        [GraphQLDescription("Nuevo estado activo/inactivo (opcional)")] bool? active = null,
+        CancellationToken cancellationToken = default)
+    {
+        return await service.UpdateAsync(id, name, serverName, serverIp, active, cancellationToken);
+    }
+
+    [GraphQLDescription("Elimina lógicamente un cluster (soft delete). Retorna true si se eliminó correctamente")]
+    public async Task<bool> SoftDeleteClusterAsync(
+        [Service] MicroservicesClusterService service,
+        [GraphQLDescription("ID del cluster a eliminar")] long id,
+        CancellationToken cancellationToken = default)
+    {
+        return await service.SoftDeleteAsync(id, cancellationToken);
+    }
+
+    [GraphQLDescription("Activa o desactiva un cluster. Retorna true si se actualizó correctamente")]
+    public async Task<bool> SetClusterActiveAsync(
+        [Service] MicroservicesClusterService service,
+        [GraphQLDescription("ID del cluster")] long id,
+        [GraphQLDescription("true para activar, false para desactivar")] bool active,
+        CancellationToken cancellationToken = default)
+    {
+        return await service.SetActiveAsync(id, active, cancellationToken);
+    }
+
+    // ========================================
+    // USERS - MUTATIONS
+    // ========================================
+
+    [GraphQLDescription("Crea un nuevo usuario en el sistema")]
+    public async Task<UserDto> CreateUserAsync(
+        [Service] UserService service,
+        [GraphQLDescription("Nombre del usuario")] string? name,
+        [GraphQLDescription("Correo electrónico del usuario")] string? email,
+        [GraphQLDescription("Código PeopleSoft del usuario (opcional)")] string? peoplesoft = null,
+        [GraphQLDescription("Indica si el usuario está activo (por defecto: true)")] bool active = true,
+        CancellationToken cancellationToken = default)
+    {
+        return await service.CreateAsync(peoplesoft, name, email, active, cancellationToken);
+    }
+
+    [GraphQLDescription("Actualiza un usuario existente. Solo se modifican los campos proporcionados")]
+    public async Task<UserDto?> UpdateUserAsync(
+        [Service] UserService service,
+        [GraphQLDescription("ID (GUID) del usuario a actualizar")] Guid id,
+        [GraphQLDescription("Nuevo nombre del usuario (opcional)")] string? name = null,
+        [GraphQLDescription("Nuevo correo electrónico (opcional)")] string? email = null,
+        [GraphQLDescription("Nuevo código PeopleSoft (opcional)")] string? peoplesoft = null,
+        [GraphQLDescription("Nuevo estado activo/inactivo (opcional)")] bool? active = null,
+        CancellationToken cancellationToken = default)
+    {
+        return await service.UpdateAsync(id, peoplesoft, name, email, active, cancellationToken);
+    }
+
+    [GraphQLDescription("Elimina permanentemente un usuario. Retorna true si se eliminó correctamente")]
+    public async Task<bool> DeleteUserAsync(
+        [Service] UserService service,
+        [GraphQLDescription("ID (GUID) del usuario a eliminar")] Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        return await service.DeleteAsync(id, cancellationToken);
+    }
+
+    [GraphQLDescription("Activa o desactiva un usuario. Retorna true si se actualizó correctamente")]
+    public async Task<bool> SetUserActiveAsync(
+        [Service] UserService service,
+        [GraphQLDescription("ID (GUID) del usuario")] Guid id,
+        [GraphQLDescription("true para activar, false para desactivar")] bool active,
+        CancellationToken cancellationToken = default)
+    {
+        return await service.SetActiveAsync(id, active, cancellationToken);
+    }
+
+    // ========================================
+    // ACTIVITY LOGS - MUTATIONS
+    // ========================================
+
+    [GraphQLDescription("Registra un nuevo log de actividad en el sistema")]
+    public async Task<ActivityLogDto> CreateActivityLogAsync(
+        [Service] ActivityLogService service,
+        [GraphQLDescription("ID del tipo de evento asociado")] long? eventTypeId,
+        [GraphQLDescription("Nombre de la entidad afectada")] string? entityName,
+        [GraphQLDescription("ID (GUID) de la entidad afectada")] Guid? entityId,
+        [GraphQLDescription("Descripción de la actividad realizada")] string? description,
+        [GraphQLDescription("ID (GUID) del usuario que realizó la acción")] Guid? userId,
+        CancellationToken cancellationToken = default)
+    {
+        return await service.CreateAsync(eventTypeId, entityName, entityId, description, userId, cancellationToken);
+    }
+
+    [GraphQLDescription("Elimina permanentemente un log de actividad. Retorna true si se eliminó correctamente")]
+    public async Task<bool> DeleteActivityLogAsync(
+        [Service] ActivityLogService service,
+        [GraphQLDescription("ID (GUID) del log de actividad a eliminar")] Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        return await service.DeleteAsync(id, cancellationToken);
+    }
+
+    // ========================================
+    // EVENT TYPES - MUTATIONS
+    // ========================================
+
+    [GraphQLDescription("Crea un nuevo tipo de evento para clasificar logs de actividad")]
+    public async Task<EventTypeDto> CreateEventTypeAsync(
+        [Service] EventTypeService service,
+        [GraphQLDescription("Descripción del tipo de evento (ej: 'Creación', 'Eliminación')")] string description,
+        CancellationToken cancellationToken = default)
+    {
+        return await service.CreateAsync(description, cancellationToken);
+    }
+
+    [GraphQLDescription("Actualiza la descripción de un tipo de evento existente")]
+    public async Task<EventTypeDto?> UpdateEventTypeAsync(
+        [Service] EventTypeService service,
+        [GraphQLDescription("ID del tipo de evento a actualizar")] long id,
+        [GraphQLDescription("Nueva descripción del tipo de evento")] string description,
+        CancellationToken cancellationToken = default)
+    {
+        return await service.UpdateAsync(id, description, cancellationToken);
+    }
+
+    [GraphQLDescription("Elimina permanentemente un tipo de evento. Retorna true si se eliminó correctamente")]
+    public async Task<bool> DeleteEventTypeAsync(
+        [Service] EventTypeService service,
+        [GraphQLDescription("ID del tipo de evento a eliminar")] long id,
+        CancellationToken cancellationToken = default)
+    {
+        return await service.DeleteAsync(id, cancellationToken);
+    }
+
+    // ========================================
+    // CREDENTIALS - MUTATIONS
+    // ========================================
+
+    [GraphQLDescription("Crea una nueva credencial para conexión al Core Connector")]
+    public async Task<CoreConnectorCredentialDto> CreateCredentialAsync(
+        [Service] CoreConnectorCredentialService service,
+        [GraphQLDescription("Nombre de usuario de la credencial")] string? user,
+        [GraphQLDescription("Contraseña de la credencial")] string? password,
+        [GraphQLDescription("Clave de autenticación adicional (opcional)")] string? key = null,
+        CancellationToken cancellationToken = default)
+    {
+        return await service.CreateAsync(user, password, key, cancellationToken);
+    }
+
+    [GraphQLDescription("Actualiza una credencial existente. Solo se modifican los campos proporcionados")]
+    public async Task<CoreConnectorCredentialDto?> UpdateCredentialAsync(
+        [Service] CoreConnectorCredentialService service,
+        [GraphQLDescription("ID de la credencial a actualizar")] long id,
+        [GraphQLDescription("Nuevo nombre de usuario (opcional)")] string? user = null,
+        [GraphQLDescription("Nueva contraseña (opcional)")] string? password = null,
+        [GraphQLDescription("Nueva clave de autenticación (opcional)")] string? key = null,
+        CancellationToken cancellationToken = default)
+    {
+        return await service.UpdateAsync(id, user, password, key, cancellationToken);
+    }
+
+    [GraphQLDescription("Elimina permanentemente una credencial. Retorna true si se eliminó correctamente")]
+    public async Task<bool> DeleteCredentialAsync(
+        [Service] CoreConnectorCredentialService service,
+        [GraphQLDescription("ID de la credencial a eliminar")] long id,
+        CancellationToken cancellationToken = default)
+    {
+        return await service.DeleteAsync(id, cancellationToken);
+    }
+
+    // ========================================
+    // CONNECTORS - MUTATIONS
+    // ========================================
+
+    [GraphQLDescription("Crea una nueva conexión entre un microservicio y el Core Connector")]
+    public async Task<MicroserviceCoreConnectorDto> CreateConnectorAsync(
+        [Service] MicroserviceCoreConnectorService service,
+        [GraphQLDescription("ID de la credencial a asociar")] long? credentialId,
+        [GraphQLDescription("ID del microservicio a conectar")] long? microserviceId,
+        CancellationToken cancellationToken = default)
+    {
+        return await service.CreateAsync(credentialId, microserviceId, cancellationToken);
+    }
+
+    [GraphQLDescription("Actualiza una conexión existente entre microservicio y Core Connector")]
+    public async Task<MicroserviceCoreConnectorDto?> UpdateConnectorAsync(
+        [Service] MicroserviceCoreConnectorService service,
+        [GraphQLDescription("ID del conector a actualizar")] long id,
+        [GraphQLDescription("Nuevo ID de credencial (opcional)")] long? credentialId = null,
+        [GraphQLDescription("Nuevo ID de microservicio (opcional)")] long? microserviceId = null,
+        CancellationToken cancellationToken = default)
+    {
+        return await service.UpdateAsync(id, credentialId, microserviceId, cancellationToken);
+    }
+
+    [GraphQLDescription("Elimina permanentemente una conexión al Core Connector. Retorna true si se eliminó correctamente")]
+    public async Task<bool> DeleteConnectorAsync(
+        [Service] MicroserviceCoreConnectorService service,
+        [GraphQLDescription("ID del conector a eliminar")] long id,
+        CancellationToken cancellationToken = default)
+    {
+        return await service.DeleteAsync(id, cancellationToken);
+    }
+}
+
+
+
+
+
+inputtype-------------------------------------------------------------------------------------------------
+/// <summary>
+/// Input para inserción masiva de LogServicesHeader
+/// </summary>
+public class BulkCreateLogServicesHeaderInput
+{
+    [GraphQLDescription("Lista de logs de servicios a crear (máximo 1000)")]
+    public List<CreateLogServicesHeaderInput> Items { get; set; } = new();
+}
+
+/// <summary>
+/// Input para inserción masiva de LogMicroservice
+/// </summary>
+public class BulkCreateLogMicroserviceInput
+{
+    [GraphQLDescription("Lista de logs de microservicio a crear (máximo 1000)")]
+    public List<CreateLogMicroserviceInput> Items { get; set; } = new();
+}
+
+
+
+public class BulkCreateLogServicesHeaderInputType : InputObjectType<BulkCreateLogServicesHeaderInput>
+{
+    protected override void Configure(IInputObjectTypeDescriptor<BulkCreateLogServicesHeaderInput> descriptor)
+    {
+        descriptor.Name("BulkCreateLogServicesHeaderInput");
+        descriptor.Description("Input para inserción masiva de logs de servicios");
+    }
+}
+
+public class BulkCreateLogMicroserviceInputType : InputObjectType<BulkCreateLogMicroserviceInput>
+{
+    protected override void Configure(IInputObjectTypeDescriptor<BulkCreateLogMicroserviceInput> descriptor)
+    {
+        descriptor.Name("BulkCreateLogMicroserviceInput");
+        descriptor.Description("Input para inserción masiva de logs de microservicio");
+    }
+}
+
+
+
+
+LogserviceHeaderType---------------------------------------------------------------------------------------------
+/// <summary>
+/// Tipo GraphQL para error individual de inserción masiva
+/// </summary>
+public class BulkInsertErrorType : ObjectType<BulkInsertError>
+{
+    protected override void Configure(IObjectTypeDescriptor<BulkInsertError> descriptor)
+    {
+        descriptor.Name("BulkInsertError");
+        descriptor.Description("Error individual en inserción masiva");
+
+        descriptor.Field(x => x.Index).Name("index").Description("Índice del item que falló (base 0)");
+        descriptor.Field(x => x.ErrorMessage).Name("errorMessage").Description("Descripción del error");
+        descriptor.Ignore(x => x.FailedItem);
+    }
+}
+
+/// <summary>
+/// Tipo GraphQL para resultado de inserción masiva de LogServicesHeader
+/// </summary>
+public class BulkInsertLogServicesHeaderResultType : ObjectType<BulkInsertResultDto<LogServicesHeaderDto>>
+{
+    protected override void Configure(IObjectTypeDescriptor<BulkInsertResultDto<LogServicesHeaderDto>> descriptor)
+    {
+        descriptor.Name("BulkInsertLogServicesHeaderResult");
+        descriptor.Description("Resultado de inserción masiva de logs de servicios");
+
+        descriptor.Field(x => x.InsertedItems).Name("insertedItems").Description("Items insertados exitosamente");
+        descriptor.Field(x => x.TotalRequested).Name("totalRequested").Description("Total de items solicitados");
+        descriptor.Field(x => x.TotalInserted).Name("totalInserted").Description("Total de items insertados");
+        descriptor.Field(x => x.TotalFailed).Name("totalFailed").Description("Total de items que fallaron");
+        descriptor.Field(x => x.Success).Name("success").Description("Indica si la operación procesó al menos un item");
+        descriptor.Field(x => x.ErrorMessage).Name("errorMessage").Description("Mensaje de error general si la operación falló completamente");
+        descriptor.Field(x => x.Errors).Name("errors").Description("Detalle de errores por cada item que falló");
+    }
+}
+
+/// <summary>
+/// Tipo GraphQL para resultado de inserción masiva de LogMicroservice
+/// </summary>
+public class BulkInsertLogMicroserviceResultType : ObjectType<BulkInsertResultDto<LogMicroserviceDto>>
+{
+    protected override void Configure(IObjectTypeDescriptor<BulkInsertResultDto<LogMicroserviceDto>> descriptor)
+    {
+        descriptor.Name("BulkInsertLogMicroserviceResult");
+        descriptor.Description("Resultado de inserción masiva de logs de microservicio");
+
+        descriptor.Field(x => x.InsertedItems).Name("insertedItems").Description("Items insertados exitosamente");
+        descriptor.Field(x => x.TotalRequested).Name("totalRequested").Description("Total de items solicitados");
+        descriptor.Field(x => x.TotalInserted).Name("totalInserted").Description("Total de items insertados");
+        descriptor.Field(x => x.TotalFailed).Name("totalFailed").Description("Total de items que fallaron");
+        descriptor.Field(x => x.Success).Name("success").Description("Indica si la operación procesó al menos un item");
+        descriptor.Field(x => x.ErrorMessage).Name("errorMessage").Description("Mensaje de error general si la operación falló completamente");
+        descriptor.Field(x => x.Errors).Name("errors").Description("Detalle de errores por cada item que falló");
+    }
+}
+
+
+
+program-------------------------------------------------------------------------------------------------------------------------------------
+    .AddType<BulkCreateLogServicesHeaderInputType>()
+    .AddType<BulkCreateLogMicroserviceInputType>()
+    .AddType<BulkInsertErrorType>()
+    .AddType<BulkInsertLogServicesHeaderResultType>()
+    .AddType<BulkInsertLogMicroserviceResultType>()
+
+
