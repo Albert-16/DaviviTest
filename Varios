@@ -1,175 +1,117 @@
+using System.Data.Odbc;
+using Dapper;
+using Domain.Models;
+using LinqForge;
+using Microsoft.Extensions.Logging;
 
+namespace Infrastructure.Repositories;
 
-//USO ANTIGUO
-var sqsg = QueryMaker(tabla, numeroIdentificacion, tipoCuentaACH, cuentaACH, 
-                        valNombreTitular, valAlias, valCuentaDestino, codTipoCuentaDestino, canal);
+public class ConsultaCuentasFavoritosRepository : IConsultaCuentasFavoritosRepository
+{
+    private readonly ILogger<ConsultaCuentasFavoritosRepository> _logger;
+    private readonly Db2Options _db2Options;
+    private readonly IOdbcConnectionFactory _connectionFactory;
 
-                    var query = sqsg._iQueryStringGenerator.GetQueryStatement();
-                    var params2 = sqsg._iQueryStringGenerator.GetParameterCollection();
-                    var ecdm = new EasyCrudDataModels(_oledbConnection);
-                    var response = ecdm.SelectExecute(sqsg);
+    public ConsultaCuentasFavoritosRepository(
+        ILogger<ConsultaCuentasFavoritosRepository> logger,
+        Db2Options db2Options,
+        IOdbcConnectionFactory connectionFactory)
+    {
+        _logger = logger;
+        _db2Options = db2Options;
+        _connectionFactory = connectionFactory;
+    }
 
+    /// <summary>
+    /// Consulta cuentas favoritas con filtros dinámicos.
+    /// Reemplaza el QueryMaker de 16 escenarios con composición dinámica.
+    /// </summary>
+    public async Task<IEnumerable<CYBFAV>> ConsultarFavoritosAsync(
+        FiltroFavoritos filtro,
+        CancellationToken cancellationToken = default)
+    {
+        // ── Construir query con filtros dinámicos ──
+        var query = new QueryBuilder<CYBFAV>(_db2Options)
+            .Select()
+            .Where(BuildWhereExpression(filtro))
+            .OrderByDescending(item => item.FechaHoraCreacion)
+            .Build();
 
-METODO A REFACTORIZAR//
-  public ServiceQueryStringGenerator QueryMaker(string[] tablas, string numeroIdentificacion, 
-            string tipoCuentaACH, string cuentaACH, string valNombreTitular, string valAlias, 
-             string valCuentaDestino, string codTipoCuentaDestino, string canal)
-        {
-            var fQuery = new FieldsQuery();
-            var sqsg = new ServiceQueryStringGenerator();
-            var pNumeroIdentificacion = fQuery.fieldQuery("NUMIDEO", numeroIdentificacion, OleDbType.VarChar, 20);
-            var pValNombreTitular = fQuery.fieldQuery("NOMTIT", valNombreTitular, OleDbType.VarChar, 150);
-            //var pcodTipoCuentaDestino = fQuery.fieldQuery("CODTIPTRN", codTipoCuentaDestino, OleDbType.VarChar, 1);
-            var pValAlias = fQuery.fieldQuery("VALALIAS", valAlias, OleDbType.VarChar, 120);
-            var pValCuentaDestino = fQuery.fieldQuery("NUMCTAD", valCuentaDestino, OleDbType.VarChar, 20);
-            //var pTipoCuentaACH = fQuery.fieldQuery("TIPCTAFO", tipoCuentaACH, OleDbType.VarChar, 2);
-            var pCuentaACH = fQuery.fieldQuery("NUMCTAO", cuentaACH, OleDbType.VarChar, 20);
-            var DCodBan = fQuery.fieldQuery("BCODES", "", OleDbType.VarChar, 20);
-            sqsg._iQueryStringGenerator.SelectAll();
+        // ── Ejecutar ──
+        await using var connection = _connectionFactory.Create();
+        await connection.OpenAsync(cancellationToken);
 
+        var resultados = await connection.QueryAsync<CYBFAV>(
+            query.Sql,
+            query.ToDapperParameters());
 
-            var escenario = 0;
-            if (!v(cuentaACH) && !v(valNombreTitular) && !v(valAlias) && !v(valCuentaDestino))
-            {
+        return resultados;
+    }
 
-                sqsg._iQueryStringGenerator.WhereAnd(DCodBan, "<>");
-                sqsg._iQueryStringGenerator.Where(pNumeroIdentificacion, "=");
+    /// <summary>
+    /// Composición dinámica de filtros.
+    /// Reemplaza los 16 if-else del QueryMaker original.
+    /// Cada filtro con valor se agrega al WHERE; si está vacío, se ignora.
+    /// </summary>
+    private static Expression<Func<CYBFAV, bool>> BuildWhereExpression(FiltroFavoritos filtro)
+    {
+        // NUMIDEO siempre es obligatorio (estaba en los 16 escenarios)
+        Expression<Func<CYBFAV, bool>> expresion = 
+            item => item.NumeroIdentidadOrigen == filtro.NumeroIdentificacion;
 
-                escenario = 1;
-            }
-            else if (!v(cuentaACH) && v(valNombreTitular) && !v(valAlias) && !v(valCuentaDestino))
-            {
-                sqsg._iQueryStringGenerator.WhereAnd(pNumeroIdentificacion, "=");
-                sqsg._iQueryStringGenerator.WhereAnd(pValNombreTitular, "LIKE");
-                escenario = 2;
-            }
-            else if (!v(cuentaACH) && !v(valNombreTitular) && v(valAlias) && !v(valCuentaDestino))
-            {
-                sqsg._iQueryStringGenerator.WhereAnd(pNumeroIdentificacion, "=");
-                sqsg._iQueryStringGenerator.WhereAnd(pValAlias, "LIKE");
-                escenario = 3;
+        // Cada filtro opcional se agrega solo si tiene valor
+        if (filtro.TieneNombreTitular)
+            expresion = expresion.AndAlso(
+                item => item.NombreTitular.Contains(filtro.NombreTitular));
 
-            }
-            else if (!v(cuentaACH) && !v(valNombreTitular) && !v(valAlias) && v(valCuentaDestino))
-            {
-                sqsg._iQueryStringGenerator.WhereAnd(pNumeroIdentificacion, "=");
-                sqsg._iQueryStringGenerator.WhereAnd(pValCuentaDestino, "LIKE");
+        if (filtro.TieneAlias)
+            expresion = expresion.AndAlso(
+                item => item.AliasCuenta.Contains(filtro.Alias));
 
-                escenario = 4;
-            }
-            else if (v(cuentaACH) && !v(valNombreTitular) && !v(valAlias) && !v(valCuentaDestino))
-            {
-                sqsg._iQueryStringGenerator.WhereAnd(pNumeroIdentificacion, "=");
-                sqsg._iQueryStringGenerator.WhereAnd(pCuentaACH, "LIKE");
-                escenario = 5;
-            }
-            else if (!v(cuentaACH) && v(valNombreTitular) && v(valAlias) && !v(valCuentaDestino))
-            {
-                sqsg._iQueryStringGenerator.WhereAnd(pNumeroIdentificacion, "=");
-                sqsg._iQueryStringGenerator.WhereAnd(pValNombreTitular, "LIKE");
-                sqsg._iQueryStringGenerator.WhereAnd(pValAlias, "LIKE");
+        if (filtro.TieneCuentaDestino)
+            expresion = expresion.AndAlso(
+                item => item.NumeroCuentaDestino.Contains(filtro.CuentaDestino));
 
-                escenario = 6;
-            }
-            else if (!v(cuentaACH) && v(valNombreTitular) && !v(valAlias) && v(valCuentaDestino))
-            {
-                sqsg._iQueryStringGenerator.WhereAnd(pNumeroIdentificacion, "=");
-                sqsg._iQueryStringGenerator.WhereAnd(pValNombreTitular, "LIKE");
-                sqsg._iQueryStringGenerator.WhereAnd(pValCuentaDestino, "LIKE");
-                escenario = 7;
-            }
-            else if (v(cuentaACH) && v(valNombreTitular) && !v(valAlias) && !v(valCuentaDestino))
-            {
-                sqsg._iQueryStringGenerator.WhereAnd(pNumeroIdentificacion, "=");
-                sqsg._iQueryStringGenerator.WhereAnd(pCuentaACH, "LIKE");
-                sqsg._iQueryStringGenerator.WhereAnd(pValNombreTitular, "LIKE");
-                escenario = 8;
-            }
-            else if (!v(cuentaACH) && !v(valNombreTitular) && v(valAlias) && v(valCuentaDestino))
-            {
-                sqsg._iQueryStringGenerator.WhereAnd(pNumeroIdentificacion, "=");
-                sqsg._iQueryStringGenerator.WhereAnd(pValAlias, "LIKE");
-                sqsg._iQueryStringGenerator.WhereAnd(pValCuentaDestino, "LIKE");
+        if (filtro.TieneCuentaACH)
+            expresion = expresion.AndAlso(
+                item => item.NumeroCuentaOrigen.Contains(filtro.CuentaACH));
 
-                escenario = 9;
-            }
-            else if (v(cuentaACH) && !v(valNombreTitular) && v(valAlias) && !v(valCuentaDestino))
-            {
-                sqsg._iQueryStringGenerator.WhereAnd(pNumeroIdentificacion, "=");
-                sqsg._iQueryStringGenerator.WhereAnd(pCuentaACH, "LIKE");
-                sqsg._iQueryStringGenerator.WhereAnd(pValAlias, "LIKE");
+        return expresion;
+    }
+}
 
-                escenario = 10;
-            }
-            else if (v(cuentaACH) && !v(valNombreTitular) && !v(valAlias) && v(valCuentaDestino))
-            {
-                sqsg._iQueryStringGenerator.WhereAnd(pNumeroIdentificacion, "=");
-                sqsg._iQueryStringGenerator.WhereAnd(pCuentaACH, "LIKE");
-                sqsg._iQueryStringGenerator.WhereAnd(pValCuentaDestino, "LIKE");
+// ── Filtro tipado que reemplaza los 9 parámetros string sueltos ──
 
-                escenario = 11;
-            }
-            else if (!v(cuentaACH) && v(valNombreTitular) && v(valAlias) && v(valCuentaDestino))
-            {
-                sqsg._iQueryStringGenerator.WhereAnd(pNumeroIdentificacion, "=");
-                sqsg._iQueryStringGenerator.WhereAnd(pValNombreTitular, "LIKE");
-                sqsg._iQueryStringGenerator.WhereAnd(pValAlias, "LIKE");
-                sqsg._iQueryStringGenerator.WhereAnd(pValCuentaDestino, "LIKE");
+/// <summary>
+/// Encapsula los criterios de búsqueda para cuentas favoritas.
+/// Reemplaza los 9 parámetros string del QueryMaker original.
+/// </summary>
+public class FiltroFavoritos
+{
+    public required string NumeroIdentificacion { get; init; }
+    public string? NombreTitular { get; init; }
+    public string? Alias { get; init; }
+    public string? CuentaDestino { get; init; }
+    public string? CuentaACH { get; init; }
 
+    // ── Validación limpia: reemplaza el método v() que checaba "%%"  ──
+    // El consumidor ya no necesita mandar "%%" para indicar "sin filtro"
+    public bool TieneNombreTitular => !string.IsNullOrWhiteSpace(NombreTitular);
+    public bool TieneAlias => !string.IsNullOrWhiteSpace(Alias);
+    public bool TieneCuentaDestino => !string.IsNullOrWhiteSpace(CuentaDestino);
+    public bool TieneCuentaACH => !string.IsNullOrWhiteSpace(CuentaACH);
+}
 
-                escenario = 12;
-            }
-            else if (v(cuentaACH) && v(valNombreTitular) && v(valAlias) && !v(valCuentaDestino))
-            {
-                sqsg._iQueryStringGenerator.WhereAnd(pNumeroIdentificacion, "=");
-                sqsg._iQueryStringGenerator.WhereAnd(pCuentaACH, "LIKE");
-                sqsg._iQueryStringGenerator.WhereAnd(pValNombreTitular, "LIKE");
-                sqsg._iQueryStringGenerator.WhereAnd(pValAlias, "LIKE");
+// ── Interface del repositorio ──
+public interface IConsultaCuentasFavoritosRepository
+{
+    Task<IEnumerable<CYBFAV>> ConsultarFavoritosAsync(
+        FiltroFavoritos filtro,
+        CancellationToken cancellationToken = default);
+}
 
-                escenario = 13;
-            }
-            else if (v(cuentaACH) && v(valNombreTitular) && !v(valAlias) && v(valCuentaDestino))
-            {
-                sqsg._iQueryStringGenerator.WhereAnd(pCuentaACH, "=");
-                sqsg._iQueryStringGenerator.WhereAnd(pValNombreTitular, "LIKE");
-                sqsg._iQueryStringGenerator.WhereAnd(pValCuentaDestino, "LIKE");
-
-                escenario = 14;
-            }
-            else if (v(cuentaACH) && !v(valNombreTitular) && v(valAlias) && v(valCuentaDestino))
-            {
-                sqsg._iQueryStringGenerator.WhereAnd(pNumeroIdentificacion, "=");
-                sqsg._iQueryStringGenerator.WhereAnd(pCuentaACH, "LIKE");
-                sqsg._iQueryStringGenerator.WhereAnd(pValAlias, "LIKE");
-                sqsg._iQueryStringGenerator.WhereAnd(pValCuentaDestino, "LIKE");
-
-                escenario = 15;
-            }
-            else if (v(cuentaACH) && v(valNombreTitular) && v(valAlias) && v(valCuentaDestino))
-            {
-                sqsg._iQueryStringGenerator.WhereAnd(pNumeroIdentificacion, "=");
-                sqsg._iQueryStringGenerator.WhereAnd(pCuentaACH, "LIKE");
-                sqsg._iQueryStringGenerator.WhereAnd(pValNombreTitular, "LIKE");
-                sqsg._iQueryStringGenerator.WhereAnd(pValAlias, "LIKE");
-                sqsg._iQueryStringGenerator.WhereAnd(pValCuentaDestino, "LIKE");
-
-                escenario = 16;
-            }
-            sqsg._iQueryStringGenerator.From("CYBERDTA", tablas[escenario - 1]);
-
-            return sqsg;
-        }
-        public bool v(string variable)
-        {
-            if (variable.Trim() == "%%")
-            {
-                return false;
-            }
-            else
-            {
-                return true;
-            }
-        }
-
-
-
+// ── Factory para la conexión (reemplaza el new OdbcConnection inline) ──
+public interface IOdbcConnectionFactory
+{
+    OdbcConnection Create();
+}
