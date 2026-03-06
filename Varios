@@ -1,163 +1,175 @@
-# LaboratorioCorreo - Librería de Envío de Correos Davivienda
 
-**Autor:** Carlos Ardón  
-**Namespace:** `LaboratorioCorreo.Service`  
-**Plataforma:** .NET (C#)
 
----
+//USO ANTIGUO
+var sqsg = QueryMaker(tabla, numeroIdentificacion, tipoCuentaACH, cuentaACH, 
+                        valNombreTitular, valAlias, valCuentaDestino, codTipoCuentaDestino, canal);
 
-## Descripción
+                    var query = sqsg._iQueryStringGenerator.GetQueryStatement();
+                    var params2 = sqsg._iQueryStringGenerator.GetParameterCollection();
+                    var ecdm = new EasyCrudDataModels(_oledbConnection);
+                    var response = ecdm.SelectExecute(sqsg);
 
-Librería para el envío de correos electrónicos a través del servicio SOAP de Souma (Buzón SP) de Davivienda Honduras. Permite crear solicitudes de correo, agregar contenido con formato HTML, adjuntar archivos en Base64 y gestionar el envío de manera asíncrona.
 
-## Dependencias
+METODO A REFACTORIZAR//
+  public ServiceQueryStringGenerator QueryMaker(string[] tablas, string numeroIdentificacion, 
+            string tipoCuentaACH, string cuentaACH, string valNombreTitular, string valAlias, 
+             string valCuentaDestino, string codTipoCuentaDestino, string canal)
+        {
+            var fQuery = new FieldsQuery();
+            var sqsg = new ServiceQueryStringGenerator();
+            var pNumeroIdentificacion = fQuery.fieldQuery("NUMIDEO", numeroIdentificacion, OleDbType.VarChar, 20);
+            var pValNombreTitular = fQuery.fieldQuery("NOMTIT", valNombreTitular, OleDbType.VarChar, 150);
+            //var pcodTipoCuentaDestino = fQuery.fieldQuery("CODTIPTRN", codTipoCuentaDestino, OleDbType.VarChar, 1);
+            var pValAlias = fQuery.fieldQuery("VALALIAS", valAlias, OleDbType.VarChar, 120);
+            var pValCuentaDestino = fQuery.fieldQuery("NUMCTAD", valCuentaDestino, OleDbType.VarChar, 20);
+            //var pTipoCuentaACH = fQuery.fieldQuery("TIPCTAFO", tipoCuentaACH, OleDbType.VarChar, 2);
+            var pCuentaACH = fQuery.fieldQuery("NUMCTAO", cuentaACH, OleDbType.VarChar, 20);
+            var DCodBan = fQuery.fieldQuery("BCODES", "", OleDbType.VarChar, 20);
+            sqsg._iQueryStringGenerator.SelectAll();
 
-```
-AsmxServiceReference
-AsmxServiceSdk
-System.ServiceModel
-```
 
-## Clases Principales
+            var escenario = 0;
+            if (!v(cuentaACH) && !v(valNombreTitular) && !v(valAlias) && !v(valCuentaDestino))
+            {
 
-### `SoumaSender`
+                sqsg._iQueryStringGenerator.WhereAnd(DCodBan, "<>");
+                sqsg._iQueryStringGenerator.Where(pNumeroIdentificacion, "=");
 
-Clase principal que encapsula el flujo completo de envío de correos.
+                escenario = 1;
+            }
+            else if (!v(cuentaACH) && v(valNombreTitular) && !v(valAlias) && !v(valCuentaDestino))
+            {
+                sqsg._iQueryStringGenerator.WhereAnd(pNumeroIdentificacion, "=");
+                sqsg._iQueryStringGenerator.WhereAnd(pValNombreTitular, "LIKE");
+                escenario = 2;
+            }
+            else if (!v(cuentaACH) && !v(valNombreTitular) && v(valAlias) && !v(valCuentaDestino))
+            {
+                sqsg._iQueryStringGenerator.WhereAnd(pNumeroIdentificacion, "=");
+                sqsg._iQueryStringGenerator.WhereAnd(pValAlias, "LIKE");
+                escenario = 3;
 
-### `EmailSenderClient`
+            }
+            else if (!v(cuentaACH) && !v(valNombreTitular) && !v(valAlias) && v(valCuentaDestino))
+            {
+                sqsg._iQueryStringGenerator.WhereAnd(pNumeroIdentificacion, "=");
+                sqsg._iQueryStringGenerator.WhereAnd(pValCuentaDestino, "LIKE");
 
-Cliente SOAP que se conecta al servicio de correo de Souma. Expone los siguientes métodos:
+                escenario = 4;
+            }
+            else if (v(cuentaACH) && !v(valNombreTitular) && !v(valAlias) && !v(valCuentaDestino))
+            {
+                sqsg._iQueryStringGenerator.WhereAnd(pNumeroIdentificacion, "=");
+                sqsg._iQueryStringGenerator.WhereAnd(pCuentaACH, "LIKE");
+                escenario = 5;
+            }
+            else if (!v(cuentaACH) && v(valNombreTitular) && v(valAlias) && !v(valCuentaDestino))
+            {
+                sqsg._iQueryStringGenerator.WhereAnd(pNumeroIdentificacion, "=");
+                sqsg._iQueryStringGenerator.WhereAnd(pValNombreTitular, "LIKE");
+                sqsg._iQueryStringGenerator.WhereAnd(pValAlias, "LIKE");
 
-| Método | Descripción |
-|--------|-------------|
-| `CreateMailAsync(...)` | Crea una solicitud de correo y devuelve un `GUIDCode` y `ShippingDate` |
-| `AddTextAsync(...)` | Agrega asunto y cuerpo HTML al correo |
-| `Base64AttachAsync(...)` | Adjunta archivos codificados en Base64 |
-| `SendMailAsync(...)` | Envía el correo previamente configurado |
+                escenario = 6;
+            }
+            else if (!v(cuentaACH) && v(valNombreTitular) && !v(valAlias) && v(valCuentaDestino))
+            {
+                sqsg._iQueryStringGenerator.WhereAnd(pNumeroIdentificacion, "=");
+                sqsg._iQueryStringGenerator.WhereAnd(pValNombreTitular, "LIKE");
+                sqsg._iQueryStringGenerator.WhereAnd(pValCuentaDestino, "LIKE");
+                escenario = 7;
+            }
+            else if (v(cuentaACH) && v(valNombreTitular) && !v(valAlias) && !v(valCuentaDestino))
+            {
+                sqsg._iQueryStringGenerator.WhereAnd(pNumeroIdentificacion, "=");
+                sqsg._iQueryStringGenerator.WhereAnd(pCuentaACH, "LIKE");
+                sqsg._iQueryStringGenerator.WhereAnd(pValNombreTitular, "LIKE");
+                escenario = 8;
+            }
+            else if (!v(cuentaACH) && !v(valNombreTitular) && v(valAlias) && v(valCuentaDestino))
+            {
+                sqsg._iQueryStringGenerator.WhereAnd(pNumeroIdentificacion, "=");
+                sqsg._iQueryStringGenerator.WhereAnd(pValAlias, "LIKE");
+                sqsg._iQueryStringGenerator.WhereAnd(pValCuentaDestino, "LIKE");
 
-### `CreateMailRequestBody`
+                escenario = 9;
+            }
+            else if (v(cuentaACH) && !v(valNombreTitular) && v(valAlias) && !v(valCuentaDestino))
+            {
+                sqsg._iQueryStringGenerator.WhereAnd(pNumeroIdentificacion, "=");
+                sqsg._iQueryStringGenerator.WhereAnd(pCuentaACH, "LIKE");
+                sqsg._iQueryStringGenerator.WhereAnd(pValAlias, "LIKE");
 
-Modelo de configuración para la solicitud de correo:
+                escenario = 10;
+            }
+            else if (v(cuentaACH) && !v(valNombreTitular) && !v(valAlias) && v(valCuentaDestino))
+            {
+                sqsg._iQueryStringGenerator.WhereAnd(pNumeroIdentificacion, "=");
+                sqsg._iQueryStringGenerator.WhereAnd(pCuentaACH, "LIKE");
+                sqsg._iQueryStringGenerator.WhereAnd(pValCuentaDestino, "LIKE");
 
-| Propiedad | Tipo | Descripción | Ejemplo |
-|-----------|------|-------------|---------|
-| `Origin` | `string` | Identificador del origen del correo | `"TEST BUZON SP"` |
-| `System` | `string` | Código del sistema emisor | `"019"` |
-| `Template` | `string` | Código de plantilla de correo | `"007"` |
-| `Adresses` | `string` | Dirección(es) de correo destinatario | `"usuario@davivienda.com.hn"` |
-| `ParameterList` | `string` | Lista de parámetros adicionales (separados por delimitador) | `""` |
-| `HoldMailShipment` | `string` | Indica si se retiene el envío (`"SI"` / `"NO"`) | `"SI"` |
+                escenario = 11;
+            }
+            else if (!v(cuentaACH) && v(valNombreTitular) && v(valAlias) && v(valCuentaDestino))
+            {
+                sqsg._iQueryStringGenerator.WhereAnd(pNumeroIdentificacion, "=");
+                sqsg._iQueryStringGenerator.WhereAnd(pValNombreTitular, "LIKE");
+                sqsg._iQueryStringGenerator.WhereAnd(pValAlias, "LIKE");
+                sqsg._iQueryStringGenerator.WhereAnd(pValCuentaDestino, "LIKE");
 
-### `CreateMailResponse`
 
-Respuesta de la creación del correo:
+                escenario = 12;
+            }
+            else if (v(cuentaACH) && v(valNombreTitular) && v(valAlias) && !v(valCuentaDestino))
+            {
+                sqsg._iQueryStringGenerator.WhereAnd(pNumeroIdentificacion, "=");
+                sqsg._iQueryStringGenerator.WhereAnd(pCuentaACH, "LIKE");
+                sqsg._iQueryStringGenerator.WhereAnd(pValNombreTitular, "LIKE");
+                sqsg._iQueryStringGenerator.WhereAnd(pValAlias, "LIKE");
 
-| Propiedad | Descripción |
-|-----------|-------------|
-| `Body.CreateMailResult.GUIDCode` | Identificador único del correo creado |
-| `Body.CreateMailResult.ShippingDate` | Fecha de envío asignada |
+                escenario = 13;
+            }
+            else if (v(cuentaACH) && v(valNombreTitular) && !v(valAlias) && v(valCuentaDestino))
+            {
+                sqsg._iQueryStringGenerator.WhereAnd(pCuentaACH, "=");
+                sqsg._iQueryStringGenerator.WhereAnd(pValNombreTitular, "LIKE");
+                sqsg._iQueryStringGenerator.WhereAnd(pValCuentaDestino, "LIKE");
 
-### `SendMailResponse`
+                escenario = 14;
+            }
+            else if (v(cuentaACH) && !v(valNombreTitular) && v(valAlias) && v(valCuentaDestino))
+            {
+                sqsg._iQueryStringGenerator.WhereAnd(pNumeroIdentificacion, "=");
+                sqsg._iQueryStringGenerator.WhereAnd(pCuentaACH, "LIKE");
+                sqsg._iQueryStringGenerator.WhereAnd(pValAlias, "LIKE");
+                sqsg._iQueryStringGenerator.WhereAnd(pValCuentaDestino, "LIKE");
 
-Respuesta del envío:
+                escenario = 15;
+            }
+            else if (v(cuentaACH) && v(valNombreTitular) && v(valAlias) && v(valCuentaDestino))
+            {
+                sqsg._iQueryStringGenerator.WhereAnd(pNumeroIdentificacion, "=");
+                sqsg._iQueryStringGenerator.WhereAnd(pCuentaACH, "LIKE");
+                sqsg._iQueryStringGenerator.WhereAnd(pValNombreTitular, "LIKE");
+                sqsg._iQueryStringGenerator.WhereAnd(pValAlias, "LIKE");
+                sqsg._iQueryStringGenerator.WhereAnd(pValCuentaDestino, "LIKE");
 
-| Propiedad | Descripción |
-|-----------|-------------|
-| `Body.SendMailResult.ProcessResult` | Resultado del proceso de envío |
+                escenario = 16;
+            }
+            sqsg._iQueryStringGenerator.From("CYBERDTA", tablas[escenario - 1]);
 
----
+            return sqsg;
+        }
+        public bool v(string variable)
+        {
+            if (variable.Trim() == "%%")
+            {
+                return false;
+            }
+            else
+            {
+                return true;
+            }
+        }
 
-## Uso Básico
 
-### 1. Envío de correo con cuerpo HTML
 
-```csharp
-public async Task EnviarCorreo()
-{
-    string correo = "destinatario@davivienda.com.hn";
-
-    // Instancia del cliente
-    EmailSenderClient client = new EmailSenderClient();
-    CreateMailRequestBody mailRequest = new CreateMailRequestBody();
-    mailRequest.Origin = "TEST BUZON SP";
-    mailRequest.System = "019";
-    mailRequest.Template = "007";
-    mailRequest.Adresses = correo;
-    mailRequest.ParameterList = "";
-    mailRequest.HoldMailShipment = "SI";
-
-    // Crear solicitud de correo
-    CreateMailResponse req = await client.CreateMailAsync(
-        mailRequest.Origin,
-        mailRequest.System,
-        mailRequest.Template,
-        mailRequest.Adresses,
-        mailRequest.ParameterList,
-        mailRequest.HoldMailShipment
-    );
-
-    var guidCode = req.Body.CreateMailResult.GUIDCode;
-    var shippingDate = req.Body.CreateMailResult.ShippingDate;
-
-    // Agregar asunto y cuerpo HTML
-    await client.AddTextAsync(
-        guidCode,
-        shippingDate,
-        "Asunto del correo",
-        "Cuerpo del correo con <b>formato HTML</b>"
-    );
-
-    // Enviar correo
-    var response = await client.SendMailAsync(guidCode, shippingDate);
-
-    Console.WriteLine($"Resultado: {response.Body.SendMailResult.ProcessResult} "
-        + $"GUID: {req.Body.CreateMailResult.GUIDCode} "
-        + $"FECHA: {req.Body.CreateMailResult.ShippingDate}");
-}
-```
-
-### 2. Envío con archivo adjunto (Base64)
-
-```csharp
-// Después de crear el correo y obtener guidCode/shippingDate:
-
-byte[] fileBytes = File.ReadAllBytes(@"\\servidor\ruta\archivo.txt");
-var base64 = Convert.ToBase64String(fileBytes);
-
-await client.Base64AttachAsync(
-    guidCode,
-    shippingDate,
-    base64,
-    "NombreArchivo.txt"
-);
-
-// Luego enviar normalmente
-var response = await client.SendMailAsync(guidCode, shippingDate);
-```
-
----
-
-## Flujo de Envío
-
-```
-1. CreateMailAsync()     → Crea la solicitud, obtiene GUIDCode + ShippingDate
-2. AddTextAsync()        → Asigna asunto y cuerpo HTML
-3. Base64AttachAsync()   → (Opcional) Adjunta archivos en Base64
-4. SendMailAsync()       → Ejecuta el envío del correo
-```
-
-## Notas Importantes
-
-- El campo `HoldMailShipment` en `"SI"` permite agregar contenido y adjuntos antes de enviar. Configurar en `"NO"` envía el correo inmediatamente al crearlo.
-- El cuerpo del correo soporta etiquetas HTML básicas (`<b>`, `<i>`, `<br>`, etc.).
-- Los archivos adjuntos deben enviarse codificados en Base64 mediante `Convert.ToBase64String()`.
-- El `GUIDCode` y `ShippingDate` son requeridos en todas las operaciones posteriores a la creación del correo.
-- Las direcciones de correo se configuran en la propiedad `Adresses` (con una sola 'd', tal como lo define el servicio SOAP).
-
-## Configuración del Servicio
-
-La conexión al servicio SOAP se gestiona a través de `System.ServiceModel`. Asegúrese de tener configurado el endpoint del servicio en el archivo `app.config` o `web.config` del proyecto consumidor, o bien configurar el binding programáticamente en `EmailSenderClient`.
-
----
-
-*Última actualización: Febrero 2026*
