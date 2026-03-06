@@ -1,117 +1,34 @@
-using System.Data.Odbc;
-using Dapper;
-using Domain.Models;
-using LinqForge;
-using Microsoft.Extensions.Logging;
+// ── Método refactorizado usando .Where() encadenados ──
+// Reemplaza el QueryMaker de 16 escenarios
 
-namespace Infrastructure.Repositories;
-
-public class ConsultaCuentasFavoritosRepository : IConsultaCuentasFavoritosRepository
+private QueryBuilder<CYBFAV> BuildQuery(FiltroFavoritos filtro, QueryBuilderOptions db2Options)
 {
-    private readonly ILogger<ConsultaCuentasFavoritosRepository> _logger;
-    private readonly Db2Options _db2Options;
-    private readonly IOdbcConnectionFactory _connectionFactory;
+    var query = new QueryBuilder<CYBFAV>(db2Options)
+        .Select()
+        .Where(item => item.NumeroIdentidadOrigen == filtro.NumeroIdentificacion);
 
-    public ConsultaCuentasFavoritosRepository(
-        ILogger<ConsultaCuentasFavoritosRepository> logger,
-        Db2Options db2Options,
-        IOdbcConnectionFactory connectionFactory)
-    {
-        _logger = logger;
-        _db2Options = db2Options;
-        _connectionFactory = connectionFactory;
-    }
+    if (filtro.TieneNombreTitular)
+        query = query.Where(item => item.NombreTitular.Contains(filtro.NombreTitular));
 
-    /// <summary>
-    /// Consulta cuentas favoritas con filtros dinámicos.
-    /// Reemplaza el QueryMaker de 16 escenarios con composición dinámica.
-    /// </summary>
-    public async Task<IEnumerable<CYBFAV>> ConsultarFavoritosAsync(
-        FiltroFavoritos filtro,
-        CancellationToken cancellationToken = default)
-    {
-        // ── Construir query con filtros dinámicos ──
-        var query = new QueryBuilder<CYBFAV>(_db2Options)
-            .Select()
-            .Where(BuildWhereExpression(filtro))
-            .OrderByDescending(item => item.FechaHoraCreacion)
-            .Build();
+    if (filtro.TieneAlias)
+        query = query.Where(item => item.AliasCuenta.Contains(filtro.Alias));
 
-        // ── Ejecutar ──
-        await using var connection = _connectionFactory.Create();
-        await connection.OpenAsync(cancellationToken);
+    if (filtro.TieneCuentaDestino)
+        query = query.Where(item => item.NumeroCuentaDestino.Contains(filtro.CuentaDestino));
 
-        var resultados = await connection.QueryAsync<CYBFAV>(
-            query.Sql,
-            query.ToDapperParameters());
+    if (filtro.TieneCuentaACH)
+        query = query.Where(item => item.NumeroCuentaOrigen.Contains(filtro.CuentaACH));
 
-        return resultados;
-    }
-
-    /// <summary>
-    /// Composición dinámica de filtros.
-    /// Reemplaza los 16 if-else del QueryMaker original.
-    /// Cada filtro con valor se agrega al WHERE; si está vacío, se ignora.
-    /// </summary>
-    private static Expression<Func<CYBFAV, bool>> BuildWhereExpression(FiltroFavoritos filtro)
-    {
-        // NUMIDEO siempre es obligatorio (estaba en los 16 escenarios)
-        Expression<Func<CYBFAV, bool>> expresion = 
-            item => item.NumeroIdentidadOrigen == filtro.NumeroIdentificacion;
-
-        // Cada filtro opcional se agrega solo si tiene valor
-        if (filtro.TieneNombreTitular)
-            expresion = expresion.AndAlso(
-                item => item.NombreTitular.Contains(filtro.NombreTitular));
-
-        if (filtro.TieneAlias)
-            expresion = expresion.AndAlso(
-                item => item.AliasCuenta.Contains(filtro.Alias));
-
-        if (filtro.TieneCuentaDestino)
-            expresion = expresion.AndAlso(
-                item => item.NumeroCuentaDestino.Contains(filtro.CuentaDestino));
-
-        if (filtro.TieneCuentaACH)
-            expresion = expresion.AndAlso(
-                item => item.NumeroCuentaOrigen.Contains(filtro.CuentaACH));
-
-        return expresion;
-    }
+    return query.OrderByDescending(item => item.FechaHoraCreacion);
 }
 
-// ── Filtro tipado que reemplaza los 9 parámetros string sueltos ──
 
-/// <summary>
-/// Encapsula los criterios de búsqueda para cuentas favoritas.
-/// Reemplaza los 9 parámetros string del QueryMaker original.
-/// </summary>
-public class FiltroFavoritos
-{
-    public required string NumeroIdentificacion { get; init; }
-    public string? NombreTitular { get; init; }
-    public string? Alias { get; init; }
-    public string? CuentaDestino { get; init; }
-    public string? CuentaACH { get; init; }
+// ── Uso ──
+var query = BuildQuery(filtro, db2Options).Build();
 
-    // ── Validación limpia: reemplaza el método v() que checaba "%%"  ──
-    // El consumidor ya no necesita mandar "%%" para indicar "sin filtro"
-    public bool TieneNombreTitular => !string.IsNullOrWhiteSpace(NombreTitular);
-    public bool TieneAlias => !string.IsNullOrWhiteSpace(Alias);
-    public bool TieneCuentaDestino => !string.IsNullOrWhiteSpace(CuentaDestino);
-    public bool TieneCuentaACH => !string.IsNullOrWhiteSpace(CuentaACH);
-}
+await using var connection = _connectionFactory.Create();
+await connection.OpenAsync(cancellationToken);
 
-// ── Interface del repositorio ──
-public interface IConsultaCuentasFavoritosRepository
-{
-    Task<IEnumerable<CYBFAV>> ConsultarFavoritosAsync(
-        FiltroFavoritos filtro,
-        CancellationToken cancellationToken = default);
-}
-
-// ── Factory para la conexión (reemplaza el new OdbcConnection inline) ──
-public interface IOdbcConnectionFactory
-{
-    OdbcConnection Create();
-}
+var resultados = await connection.QueryAsync<CYBFAV>(
+    query.Sql,
+    query.ToDapperParameters());
