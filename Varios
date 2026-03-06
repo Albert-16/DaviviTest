@@ -1,107 +1,110 @@
-using System.Data.Odbc;
-using Dapper;
-using Domain.Models;
-using LinqForge;
-using Microsoft.Extensions.Logging;
+// ============================================================
+// DENTRO DE InfrastructureRepository.cs
+// Solo mostrando la parte del DoExecute que cambia
+// y el método privado BuildQuery que se agrega
+// ============================================================
 
-namespace Infrastructure.Repository;
+// ... (todo lo que ya tenés arriba: conexión JT400, CallProgramAsync, etc. se mantiene igual) ...
 
-public class ConsultaCuentasFavoritosRepository : IConsultaCuentasFavoritosRepository
+// Seteo de Información (esto ya lo tenés)
+var codTipoCuentaDestino = cyb00035lc.CodTipoCuentaDestino;
+var codTipoTransaccion = cyb00035lc.TipoIdentificacion;
+var numeroIdentificacion = cyb00035lc.NumeroIdentificacion;
+var canal = cyb00035lc.Canal;
+
+// Datos de Filtro - YA NO necesitás agregar "%" manualmente
+var nombreTitular = cyb00035lc.ValNombreTitular?.Trim();
+var alias = cyb00035lc.ValAlias?.Trim();
+var cuentaDestino = cyb00035lc.ValCuentaDestino?.Trim();
+var cuentaACH = cyb00035lc.CuentaACH?.Trim();
+
+if (cyb00035lc.ModoDeOperacion.Equals("2"))
 {
-    private readonly ILogger<ConsultaCuentasFavoritosRepository> _logger;
-    private readonly QueryBuilderOptions _db2Options;
-    private readonly IOdbcConnectionFactory _connectionFactory;
+    // Mapeo de tipo de cuenta (esto se mantiene pero limpio)
+    codTipoCuentaDestino = MapearTipoCuenta(codTipoCuentaDestino);
 
-    public ConsultaCuentasFavoritosRepository(
-        ILogger<ConsultaCuentasFavoritosRepository> logger,
-        QueryBuilderOptions db2Options,
-        IOdbcConnectionFactory connectionFactory)
+    // Opciones de LinqForge
+    var db2Options = new QueryBuilderOptions
     {
-        _logger = logger;
-        _db2Options = db2Options;
-        _connectionFactory = connectionFactory;
-    }
+        Dialect = SqlDialect.Db2,
+        Library = "CYBERDTA",
+        TrimStrings = true,
+    };
 
-    /// <summary>
-    /// Consulta cuentas favoritas con filtros dinámicos.
-    /// Reemplaza el QueryMaker de 16 escenarios con composición dinámica.
-    /// </summary>
-    public async Task<IEnumerable<CYBFAV>> ConsultarFavoritosAsync(
-        FiltroFavoritos filtro,
-        CancellationToken cancellationToken = default)
-    {
-        var query = BuildQuery(filtro).Build();
+    // ── Query con filtros dinámicos ──
+    // Reemplaza: el array de 16 tablas IFAV1-IFAV16, 
+    //            el QueryMaker de 16 escenarios,
+    //            y el bug del queryAs sin else
+    var queryAs = BuildQuery(db2Options, numeroIdentificacion, codTipoCuentaDestino,
+                             nombreTitular, alias, cuentaDestino, cuentaACH);
 
-        _logger.LogInformation("Query generada: {Sql}", query.Sql);
+    // Conexión y ejecución (esto ya lo tenés, solo corregido)
+    Stopwatch sw = Stopwatch.StartNew();
+    var database = new OdbcConnection($"Driver={{{_configManager.GetString("AS400ODBC.driver")}}};System={_configManager.GetString("AS400Connection.Host")};...");
+    database.Open();
+    sw.Stop();
+    _logger.LogInformation("Duracion de la conexion a la base de datos {Elapsed}ms", sw.Elapsed.TotalMilliseconds);
 
-        await using var connection = _connectionFactory.Create();
-        await connection.OpenAsync(cancellationToken);
+    sw.Restart();
+    var query = queryAs.Build();
+    var resultados = await database.QueryAsync<CYBFAV>(query.Sql, query.ToDapperParameters());
+    sw.Stop();
+    _logger.LogInformation("Duracion de la query CYBFAV {Elapsed}ms", sw.Elapsed.TotalMilliseconds);
 
-        var resultados = await connection.QueryAsync<CYBFAV>(
-            query.Sql,
-            query.ToDapperParameters());
-
-        return resultados;
-    }
-
-    /// <summary>
-    /// Construye la query con filtros dinámicos encadenados.
-    /// Cada .Where() con valor agrega un AND al SQL.
-    /// Reemplaza los 16 if-else del QueryMaker original.
-    /// </summary>
-    private QueryBuilder<CYBFAV> BuildQuery(FiltroFavoritos filtro)
-    {
-        var query = new QueryBuilder<CYBFAV>(_db2Options)
-            .Select()
-            .Where(item => item.NumeroIdentidadOrigen == filtro.NumeroIdentificacion);
-
-        if (filtro.TieneNombreTitular)
-            query = query.Where(item => item.NombreTitular.Contains(filtro.NombreTitular!));
-
-        if (filtro.TieneAlias)
-            query = query.Where(item => item.AliasCuenta.Contains(filtro.Alias!));
-
-        if (filtro.TieneCuentaDestino)
-            query = query.Where(item => item.NumeroCuentaDestino.Contains(filtro.CuentaDestino!));
-
-        if (filtro.TieneCuentaACH)
-            query = query.Where(item => item.NumeroCuentaOrigen.Contains(filtro.CuentaACH!));
-
-        return query.OrderByDescending(item => item.FechaHoraCreacion);
-    }
+    // ... resto del procesamiento de resultados ...
 }
+// else { ... el otro modo de operación ... }
 
-// ── Filtro tipado ──
+
+// ============================================================
+// MÉTODOS PRIVADOS - agregar al final de InfrastructureRepository
+// ============================================================
 
 /// <summary>
-/// Encapsula los criterios de búsqueda para cuentas favoritas.
-/// Reemplaza los 9 parámetros string del QueryMaker original.
-/// El consumidor ya no necesita mandar "%%" para indicar "sin filtro".
+/// Construye la query de favoritos con filtros dinámicos.
+/// Reemplaza el QueryMaker de 16 escenarios y las 16 tablas IFAV.
 /// </summary>
-public class FiltroFavoritos
+private QueryBuilder<CYBFAV> BuildQuery(
+    QueryBuilderOptions db2Options,
+    string numeroIdentificacion,
+    string codTipoCuentaDestino,
+    string? nombreTitular,
+    string? alias,
+    string? cuentaDestino,
+    string? cuentaACH)
 {
-    public required string NumeroIdentificacion { get; init; }
-    public string? NombreTitular { get; init; }
-    public string? Alias { get; init; }
-    public string? CuentaDestino { get; init; }
-    public string? CuentaACH { get; init; }
+    var query = new QueryBuilder<CYBFAV>(db2Options)
+        .Select()
+        .Where(item => item.NumeroIdentidadOrigen == numeroIdentificacion);
 
-    public bool TieneNombreTitular => !string.IsNullOrWhiteSpace(NombreTitular);
-    public bool TieneAlias => !string.IsNullOrWhiteSpace(Alias);
-    public bool TieneCuentaDestino => !string.IsNullOrWhiteSpace(CuentaDestino);
-    public bool TieneCuentaACH => !string.IsNullOrWhiteSpace(CuentaACH);
+    // Filtro por tipo de cuenta (solo si no es "A" = todos)
+    if (!codTipoCuentaDestino.Equals("A"))
+        query = query.Where(item => item.TipoCuentaDestino == codTipoCuentaDestino);
+
+    // Filtros opcionales — cada uno se agrega solo si tiene valor
+    if (!string.IsNullOrWhiteSpace(nombreTitular))
+        query = query.Where(item => item.NombreTitular.Contains(nombreTitular));
+
+    if (!string.IsNullOrWhiteSpace(alias))
+        query = query.Where(item => item.AliasCuenta.Contains(alias));
+
+    if (!string.IsNullOrWhiteSpace(cuentaDestino))
+        query = query.Where(item => item.NumeroCuentaDestino.Contains(cuentaDestino));
+
+    if (!string.IsNullOrWhiteSpace(cuentaACH))
+        query = query.Where(item => item.NumeroCuentaOrigen.Contains(cuentaACH));
+
+    return query.OrderByDescending(item => item.TipoCuentaDestino);
 }
 
-// ── Interfaces ──
-
-public interface IConsultaCuentasFavoritosRepository
+/// <summary>
+/// Mapea el código de tipo de cuenta del request al código del AS400.
+/// </summary>
+private static string MapearTipoCuenta(string codigo) => codigo switch
 {
-    Task<IEnumerable<CYBFAV>> ConsultarFavoritosAsync(
-        FiltroFavoritos filtro,
-        CancellationToken cancellationToken = default);
-}
-
-public interface IOdbcConnectionFactory
-{
-    OdbcConnection Create();
-}
+    "P" => "50",  // Préstamos
+    "S" => "60",  // (sin comentario en original)
+    "T" => "89",  // Tarjetas de crédito
+    "G" => "G",   // Seguros
+    _   => "A",   // Todos los productos
+};
