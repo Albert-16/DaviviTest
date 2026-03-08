@@ -1,110 +1,54 @@
-// ============================================================
-// DENTRO DE InfrastructureRepository.cs
-// Solo mostrando la parte del DoExecute que cambia
-// y el método privado BuildQuery que se agrega
-// ============================================================
+  //MAPEO DE LA RESPUESTA
+                    if (cyb00035cl.GetValue("canal").Equals("4"))
+                    {
+                        //--NUMCTAD--NUMIDEO
+                        var listado = new List<EasyMappingTool>();
+                        listado = response;
+                        var listado2 = new List<EasyMappingTool>();
 
-// ... (todo lo que ya tenés arriba: conexión JT400, CallProgramAsync, etc. se mantiene igual) ...
+                        foreach (var row in response)
+                        {
+                            if (row.GetValue("TIPCTAFD").Equals("CU"))
+                            {
+                                row.SetValue("TIPCTAFD", "1");
+                            }
+                            if (row.GetValue("TIPCTAFD").Equals("PR"))
+                            {
+                                row.SetValue("TIPCTAFD", "3");
+                            }
+                            if (row.GetValue("TIPCTAFD").Equals("TA"))
+                            {
+                                row.SetValue("TIPCTAFD", "4");
+                            }
 
-// Seteo de Información (esto ya lo tenés)
-var codTipoCuentaDestino = cyb00035lc.CodTipoCuentaDestino;
-var codTipoTransaccion = cyb00035lc.TipoIdentificacion;
-var numeroIdentificacion = cyb00035lc.NumeroIdentificacion;
-var canal = cyb00035lc.Canal;
+                            bool exist = false;
 
-// Datos de Filtro - YA NO necesitás agregar "%" manualmente
-var nombreTitular = cyb00035lc.ValNombreTitular?.Trim();
-var alias = cyb00035lc.ValAlias?.Trim();
-var cuentaDestino = cyb00035lc.ValCuentaDestino?.Trim();
-var cuentaACH = cyb00035lc.CuentaACH?.Trim();
-
-if (cyb00035lc.ModoDeOperacion.Equals("2"))
-{
-    // Mapeo de tipo de cuenta (esto se mantiene pero limpio)
-    codTipoCuentaDestino = MapearTipoCuenta(codTipoCuentaDestino);
-
-    // Opciones de LinqForge
-    var db2Options = new QueryBuilderOptions
-    {
-        Dialect = SqlDialect.Db2,
-        Library = "CYBERDTA",
-        TrimStrings = true,
-    };
-
-    // ── Query con filtros dinámicos ──
-    // Reemplaza: el array de 16 tablas IFAV1-IFAV16, 
-    //            el QueryMaker de 16 escenarios,
-    //            y el bug del queryAs sin else
-    var queryAs = BuildQuery(db2Options, numeroIdentificacion, codTipoCuentaDestino,
-                             nombreTitular, alias, cuentaDestino, cuentaACH);
-
-    // Conexión y ejecución (esto ya lo tenés, solo corregido)
-    Stopwatch sw = Stopwatch.StartNew();
-    var database = new OdbcConnection($"Driver={{{_configManager.GetString("AS400ODBC.driver")}}};System={_configManager.GetString("AS400Connection.Host")};...");
-    database.Open();
-    sw.Stop();
-    _logger.LogInformation("Duracion de la conexion a la base de datos {Elapsed}ms", sw.Elapsed.TotalMilliseconds);
-
-    sw.Restart();
-    var query = queryAs.Build();
-    var resultados = await database.QueryAsync<CYBFAV>(query.Sql, query.ToDapperParameters());
-    sw.Stop();
-    _logger.LogInformation("Duracion de la query CYBFAV {Elapsed}ms", sw.Elapsed.TotalMilliseconds);
-
-    // ... resto del procesamiento de resultados ...
-}
-// else { ... el otro modo de operación ... }
-
-
-// ============================================================
-// MÉTODOS PRIVADOS - agregar al final de InfrastructureRepository
-// ============================================================
-
-/// <summary>
-/// Construye la query de favoritos con filtros dinámicos.
-/// Reemplaza el QueryMaker de 16 escenarios y las 16 tablas IFAV.
-/// </summary>
-private QueryBuilder<CYBFAV> BuildQuery(
-    QueryBuilderOptions db2Options,
-    string numeroIdentificacion,
-    string codTipoCuentaDestino,
-    string? nombreTitular,
-    string? alias,
-    string? cuentaDestino,
-    string? cuentaACH)
-{
-    var query = new QueryBuilder<CYBFAV>(db2Options)
-        .Select()
-        .Where(item => item.NumeroIdentidadOrigen == numeroIdentificacion);
-
-    // Filtro por tipo de cuenta (solo si no es "A" = todos)
-    if (!codTipoCuentaDestino.Equals("A"))
-        query = query.Where(item => item.TipoCuentaDestino == codTipoCuentaDestino);
-
-    // Filtros opcionales — cada uno se agrega solo si tiene valor
-    if (!string.IsNullOrWhiteSpace(nombreTitular))
-        query = query.Where(item => item.NombreTitular.Contains(nombreTitular));
-
-    if (!string.IsNullOrWhiteSpace(alias))
-        query = query.Where(item => item.AliasCuenta.Contains(alias));
-
-    if (!string.IsNullOrWhiteSpace(cuentaDestino))
-        query = query.Where(item => item.NumeroCuentaDestino.Contains(cuentaDestino));
-
-    if (!string.IsNullOrWhiteSpace(cuentaACH))
-        query = query.Where(item => item.NumeroCuentaOrigen.Contains(cuentaACH));
-
-    return query.OrderByDescending(item => item.TipoCuentaDestino);
-}
-
-/// <summary>
-/// Mapea el código de tipo de cuenta del request al código del AS400.
-/// </summary>
-private static string MapearTipoCuenta(string codigo) => codigo switch
-{
-    "P" => "50",  // Préstamos
-    "S" => "60",  // (sin comentario en original)
-    "T" => "89",  // Tarjetas de crédito
-    "G" => "G",   // Seguros
-    _   => "A",   // Todos los productos
-};
+                            string cuentaD = row.GetValue("NUMCTAD").ToString();
+                            string IDcuenta = row.GetValue("NUMIDEO").ToString();
+                            foreach (var row2 in listado2)
+                            {
+                                string cuentaD2 = row2.GetValue("NUMCTAD").ToString();
+                                string IDcuenta2 = row2.GetValue("NUMIDEO").ToString();
+                                if (cuentaD2 == cuentaD && IDcuenta2 == IDcuenta)
+                                {
+                                    string fechast1 = row2.GetValue("FCHFAVCR");
+                                    string fechast2 = row.GetValue("FCHFAVCR");
+                                    string forma = "dd/MM/yyyy'T'HH:mm:sszzz";
+                                    DateTime fecha = DateTime.ParseExact(fechast1, forma, CultureInfo.InvariantCulture);
+                                    DateTime fecha2 = DateTime.ParseExact(fechast2, forma, CultureInfo.InvariantCulture);
+                                    if (fecha2 > fecha)
+                                    {
+                                        listado2.Remove(row2);
+                                        break;
+                                    }
+                                    exist = true;
+                                    break;
+                                }
+                            }
+                            if (!exist)
+                            {
+                                listado2.Add(row);
+                            }
+                        }
+                        response = listado2;
+                    }
