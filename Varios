@@ -1,44 +1,173 @@
-using LinqForge.Attributes;
+using System.Collections.Generic;
 
-namespace Domain.Models
+namespace Infrastructure.Dictionaries
 {
-    [Table("CYBFAVC", Schema = "CYBERDTA")]
-    public record CYBFAVC
+    public static class TableDictionaries
     {
-        [Column("CODBCO")]
-        public string CodigoBanco { get; set; }
+        //Diccionario de campos 
+        //Tabla: CYBFAV
+        //Libreria: CYBERDTA
+        public static Dictionary<string, string> CybFavDictionary()
+        {
+            Dictionary<string, string> associativeArray = new Dictionary<string, string>() {
+                { "CODBCO"   , "codigoDeBanco" },
+                { "NUMCTAD"  , "numeroDeCuenta" },
+                { "BCODES"   , "valBancoDestino" },
+                { "VALEST"   , "descripcion" },
+                { "FCHFAVCR" , "valFechaHoraCreacion" },
+                { "CODMOND"  , "codMoneda" },
+                { "VALALIAS" , "alias" },
+                { "NOMTIT"   , "nombreCliente" },
+                { "NUMIDED"  , "numeroDeIdentificacionCuenta" },
+                { "NUMCTAO"  , "valCuentaOrigen" },
+                { "CODTIPTRN", "codTipoTransaccion" },
+                { "GUIDCTFV" , "guid" },
+                { "TIPCTAFD" , "tipoCtaDestino" },
+                { "TIPCTAFO" , "tipoCtaOrigen" },
+                { "CODMONO"  , "monedaOrigen" }
 
-        [Column("CODMOND")]
-        public string MonedaDestino { get; set; }
+            };
 
-        [Column("CODMONO")]
-        public string MonedaOrigen { get; set; }
+            return associativeArray;
+        }
 
-        [Column("CODTIPTRN")]
-        public string CodTipoTransaccion { get; set; }
 
-        [Column("FAVMAIL")]
-        public string Correo { get; set; }
+        public static Dictionary<string, string> ProductosTP()
+        {
+            //to-do Jose Leon
+            //column["COXBCO"]
+            //public string codigoDeBanco {get;set;}
+            //el valor del campo del as400 "COXBCO" ya queda en una propiedad llamada codigoDeBanco queda lista para enviar al canal
+            //sin necesidad de recorer usando un foreach para asignar el valor.
+            Dictionary<string, string> ProductosTP = new Dictionary<string, string>() {
+                { "COXBCO"   , "codigoDeBanco" },
+                { "NUXCTAD"  , "numeroDeCuenta" },
+                { "BCXDES"   , "valBancoDestino" },
+                { "VALXEST"   , "descripcion" },
+                { "FCXFAVCR" , "valFechaHoraCreacion" },
+                { "COXMOND"  , "codMoneda" },
+                { "VAXALIAS" , "alias" },
+                { "NOXTIT"   , "nombreCliente" },
+                { "NUXIDED"  , "numeroDeIdentificacionCuenta" },
+                { "NUXCTAO"  , "valCuentaOrigen" },
+                { "CTIPTRN"  , "codTipoTransaccion" },
+                { "GUIXCTFV" , "guid" },
+                { "TIXCTAFD" , "tipoCtaDestino" },
+                { "TIXCTAFO" , "tipoCtaOrigen" },
+                { "COXMONO"  , "monedaOrigen" }
 
-        [Column("GUIDCOR")]
-        public string IdentificadorUnico { get; set; }
+            };
 
-        [Column("NUMCTAD")]
-        public string NumeroCuentaDestino { get; set; }
+            return ProductosTP;
+        }
 
-        [Column("NUMCTAO")]
-        public string NumeroCuentaOrigen { get; set; }
+        public static Dictionary<string, string> ProductosGS()
+        {
+            Dictionary<string, string> ProductosGS = new Dictionary<string, string>() {
+                { "BCXDES" , "codigoDeBanco" },
+                { "NUXCTAD"  , "numeroDeCuenta" },
+                { "COXBCO"   , "valBancoDestino" },
+                { "VALXEST"   , "descripcion" },
+                { "FCXFAVCR" , "valFechaHoraCreacion" },
+                { "COXMOND"  , "codMoneda" },
+                { "VAXALIAS" , "alias" },
+                { "NOXTIT"   , "nombreCliente" },
+                { "NUXIDED"  , "numeroDeIdentificacionCuenta" },
+                { "NUXCTAO"  , "valCuentaOrigen" },
+                { "TIXCTAFO"  , "codTipoTransaccion" },
+                { "GUIXCTFV" , "guid" },
+                { "TIXCTAFD" , "tipoCtaDestino" },
+                { "CTIPTRN" , "tipoCtaOrigen" },
+                { "COXMONO"  , "monedaOrigen" }
 
-        [Column("NUMIDED")]
-        public string NumeroIdentidadDestino { get; set; }
+            };
 
-        [Column("NUMIDEO")]
-        public string NumeroIdentidadOrigen { get; set; }
+            return ProductosGS;
+        }
 
-        [Column("TIPCTAFD")]
-        public string TipoCuentaDestino { get; set; }
 
-        [Column("TIPCTAFO")]
-        public string TipoCuentaOrigen { get; set; }
+        public static Dictionary<string, string> ProductosG()
+        {
+            Dictionary<string, string> ProductosG = new Dictionary<string, string>() {
+                { "TIXCTAFD" , "codigoDeBanco" },
+                { "NUXCTAO"  , "numeroDeCuenta" },
+                { "BCXDES"   , "valBancoDestino" },
+                { "VALXEST"   , "descripcion" },
+                { "FCXFAVCR" , "valFechaHoraCreacion" },
+                { "COXMOND"  , "codMoneda" },
+                { "VAXALIAS" , "alias" },
+                { "NOXTIT"   , "nombreCliente" },
+                { "NUXIDED"  , "numeroDeIdentificacionCuenta" },
+                { "NUXIDED"  , "valCuentaOrigen" },
+                { "TIXCTAFO"  , "codTipoTransaccion" },
+                { "GUIXCTFV" , "guid" },
+                { "TIXCTAFD" , "tipoCtaDestino" },
+                { "TIXCTAFO" , "tipoCtaOrigen" },
+                { "COXMONO"  , "monedaOrigen" }
+
+            };
+
+            return ProductosG;
+        }
+
+        public static Dictionary<string, string> CamposCuentasDavivienda()
+        {
+            Dictionary<string, string> associativeArray = new Dictionary<string, string>() {
+
+                { "CODBCD2"   , "codigoDeBanco" },
+                { "NUMCTAE2"  , "numeroDeCuenta" },
+                { "BCODET2"   , "valBancoDestino" },
+                { "DESCBE2"   , "descripcion" },
+                { "FCHFAVC2"  , "valFechaHoraCreacion" },
+                { "CODMONE2"  , "codMoneda" },
+                { "VALALIA2"  , "alias" },
+                { "NOMTI2"    , "nombreCliente" },
+                { "NUMIDEE2"  , "numeroDeIdentificacionCuenta" },
+                { "NUMCTA2"   , "valCuentaOrigen" },
+                { "CODTIPTR2" , "codTipoTransaccion" },
+                { "GUIDCTF2"  , "guid" },
+                { "TIPCTAFE2" , "tipoCtaDestino" },
+                { "TIPCTAF2"  , "tipoCtaOrigen" },
+                { "CODMON2"   , "monedaOrigen" },
+                { "VALESTA2"  , "estado" },
+                //{ "NUMCTAE2"  , "valCuentaDestino" }
+            };
+
+            return associativeArray;
+        }
+        //Diccionario de campos 
+        //Tabla: CYBCFCO
+        //Libreria: CYBERDTA
+        public static Dictionary<string, string> ValidateFieldsFav()
+        {
+            Dictionary<string, string> associativeArray = new Dictionary<string, string>() {
+
+                { "FAVMAIL", "valEmail" },
+                { "GUIDCOR", "guid" },
+            };
+
+            return associativeArray;
+        }
+        public static Dictionary<string, string> EmailSinpe()
+        {
+            Dictionary<string, string> associativeArray = new Dictionary<string, string>() {
+
+                { "EC212EMAI", "valEmail" },
+            };
+
+            return associativeArray;
+        }
+        //Diccionario de campos 
+        //Tabla: CYBCFCO
+        //Libreria: CYBERDTA
+        public static Dictionary<string, string> ValidateFieldsOnlyFav()
+        {
+            Dictionary<string, string> associativeArray = new Dictionary<string, string>() {
+
+                { "FAVMAIL", "valEmail" },
+            };
+
+            return associativeArray;
+        }
     }
 }
