@@ -1,54 +1,242 @@
-  //MAPEO DE LA RESPUESTA
-                    if (cyb00035cl.GetValue("canal").Equals("4"))
+
+                    //Obtener los Correos 
+                    
+                    ServiceQueryStringGenerator sqsgQr = new ServiceQueryStringGenerator();
+                    sqsgQr._iQueryStringGenerator.SelectAll();
+                    sqsgQr._iQueryStringGenerator.From("CYBERDTA", "ICYBFAVC03");
+                    sqsgQr._iQueryStringGenerator.Where(CrearParametros.CreateEasyParameter("NUMIDEO", ParameterDirection.InputOutput, numeroIdentificacion, OleDbType.VarChar, 20), "=");
+                    EasyCrudDataModels ecdsel = new EasyCrudDataModels(_oledbConnection);
+                    List<EasyMappingTool> resultqy = ecdsel.SelectExecute(sqsgQr);
+
+                    /*resultqy= (from item in resultqy
+                               where item.GetValue("GUIDCOR") == "bf47b047-3519-40f5-9da4-b0716315221c"
+                               select item).ToList();*/
+
+
+
+                    var cybi0060cl = new CYBI0060CL();
+                    var nameTagMapper = new Mapper(_sunitpService, _oledbConnection, cybi0060cl);
+                    var cant = 0;
+                    var archivoContinuacion = cyb00035cl.GetValue("registroSiguiente");
+                    archivoContinuacion = (archivoContinuacion.Trim() == "") ? "0" : archivoContinuacion;
+                    var inicio = int.Parse(archivoContinuacion);
+                    //to-do Jose Leon 
+                    // Refactor mismo problema es una funcion que recorreo entidades para mapear.
+                    Data tags =
+                    nameTagMapper.MapData(response, TableDictionaries.CybFavDictionary(), "Registro", inicio, 1, codTipoCuentaDestino, ref cant, resultqy);
+                    var rdm = new ResponseDataMapper("", "RESPONSE", "", "00000000000000000000", "PROCESO REALIZADO EXITOSAMENTE", "");
+
+                    // tags.DataList.Count;
+                    if (archivoContinuacion.Trim() == "") { archivoContinuacion = "0"; }
+                    if (archivoContinuacion.Trim() == "0")
                     {
-                        //--NUMCTAD--NUMIDEO
-                        var listado = new List<EasyMappingTool>();
-                        listado = response;
-                        var listado2 = new List<EasyMappingTool>();
-
-                        foreach (var row in response)
+                        if (cant > 250)
                         {
-                            if (row.GetValue("TIPCTAFD").Equals("CU"))
-                            {
-                                row.SetValue("TIPCTAFD", "1");
-                            }
-                            if (row.GetValue("TIPCTAFD").Equals("PR"))
-                            {
-                                row.SetValue("TIPCTAFD", "3");
-                            }
-                            if (row.GetValue("TIPCTAFD").Equals("TA"))
-                            {
-                                row.SetValue("TIPCTAFD", "4");
-                            }
+                            cyb00035cl.SetValue("archivoContinuacion", "251");
+                            cyb00035cl.SetValue("valTalonRegistroAnterior", "0");
 
-                            bool exist = false;
-
-                            string cuentaD = row.GetValue("NUMCTAD").ToString();
-                            string IDcuenta = row.GetValue("NUMIDEO").ToString();
-                            foreach (var row2 in listado2)
-                            {
-                                string cuentaD2 = row2.GetValue("NUMCTAD").ToString();
-                                string IDcuenta2 = row2.GetValue("NUMIDEO").ToString();
-                                if (cuentaD2 == cuentaD && IDcuenta2 == IDcuenta)
-                                {
-                                    string fechast1 = row2.GetValue("FCHFAVCR");
-                                    string fechast2 = row.GetValue("FCHFAVCR");
-                                    string forma = "dd/MM/yyyy'T'HH:mm:sszzz";
-                                    DateTime fecha = DateTime.ParseExact(fechast1, forma, CultureInfo.InvariantCulture);
-                                    DateTime fecha2 = DateTime.ParseExact(fechast2, forma, CultureInfo.InvariantCulture);
-                                    if (fecha2 > fecha)
-                                    {
-                                        listado2.Remove(row2);
-                                        break;
-                                    }
-                                    exist = true;
-                                    break;
-                                }
-                            }
-                            if (!exist)
-                            {
-                                listado2.Add(row);
-                            }
                         }
-                        response = listado2;
+                        else
+                        {
+                            cyb00035cl.SetValue("archivoContinuacion", "0");
+                            cyb00035cl.SetValue("valTalonRegistroAnterior", "0");
+                        }
+                        cyb00035cl.SetValue("cantidadRegistros", cant.ToString());
+
                     }
+                    else
+                    {
+                        var cantRegistros = cant - inicio;
+                        cyb00035cl.SetValue("cantidadRegistros", cantRegistros.ToString());
+                        var valArchivoContinuacion = int.Parse(archivoContinuacion);
+                        if ((cant - inicio) > 250)
+                        {
+                            cyb00035cl.SetValue("valTalonRegistroAnterior", valArchivoContinuacion.ToString());
+                            valArchivoContinuacion = valArchivoContinuacion + 250;
+                            cyb00035cl.SetValue("archivoContinuacion", valArchivoContinuacion.ToString().Trim());
+                        }
+                        else
+                        {
+                            cyb00035cl.SetValue("archivoContinuacion", "0");
+                            valArchivoContinuacion = (valArchivoContinuacion - 250 == 1) ? 0 : (valArchivoContinuacion - 250);
+
+                            cyb00035cl.SetValue("valTalonRegistroAnterior", valArchivoContinuacion.ToString());
+
+                        }
+                    }
+                    // Buscan Resgistros para evaluar si tiene productos 
+                    Data Registro = (from item in tags.DataList
+                                     where item.Field == "Registro"
+                                     select item).FirstOrDefault();
+                    //to-do Jose Leon
+                    // esta validacion ne es necesario que se comprube e de esta forma podria basarse en la informacion de resultqy que es la consulta
+                    // si esa consulta no trae nada se setean esos errores y se envia la response, no como actualmente se realiza que se tiene que mapear para poder validar.
+                    if (Registro == null)
+                    {
+                        cyb00035cl.SetValue("codMsgRespuesta", "180306");// "180306"); //211
+                        cyb00035cl.SetValue("msgRespuesta", "No posee productos inscritos para esta funcionalidad");// "Actualmente no tiene inscritos que le permitan usar esta opción");//No posee productos inscritos para esta funcionalidad
+                        cyb00035cl.SetValue("caracterAceptacion", "M");
+                    }
+
+
+
+                    dataResponse = rdm.Map(cyb00035cl);
+                    dataResponse.DataList.Add(tags);
+
+
+
+
+
+//metodo map data
+
+  public Data MapData(List<EasyMappingTool> response, Dictionary<string, string> diccionary, string nombre, int contador, int t, string codTipoCuentaDestino, ref int cant, List<EasyMappingTool> CorreoRes)
+        {
+            int contaFinal = contador + 250;
+            var index = 0;
+
+            Data lista = new Data
+            {
+                HasData = true,
+                Field = $"{nombre}s",
+                Id = index.ToString(),
+                DataList = new List<Data>()
+            };
+
+            var bandera = 0;
+            string estado = "";
+
+            var fQuery = new FieldsQuery();
+            foreach (EasyMappingTool item in response)
+            {
+                var temp = CorreoRes;
+                var gid1= item.GetValue("GUIDCTFV").ToString();
+                //Valida que la cuenta se de 10 digitos si no los rellena con 0
+                /*var cuenta = item.GetValue("NUMCTAO").ToString();
+                if (cuenta.Length < 10)
+                {
+                    cuenta = cuenta.PadLeft(10, '0');
+                    item.SetValue("NUMCTAO", cuenta);
+                }*/
+                if (codTipoCuentaDestino == "T" || (codTipoCuentaDestino == item.GetValue("CODTIPTRN")))
+                {
+
+                    index++;
+
+                    if (index >= contador && index <= contaFinal)
+                    {
+
+                       
+
+                        Data registro = new Data
+                        {
+                            HasData = true,
+                            Field = nombre,
+                            Id = index.ToString(),
+                            DataList = new List<Data>()
+                        };
+
+
+                        //ResponseDataMapper responseDataMapper = new ResponseDataMapper("", "", "", "", "", "");
+                        
+                        registro.DataList.Add(CrearParametros.GetData("codigoDeBanco", item.GetValue("CODBCO").Trim(), true));
+                        registro.DataList.Add(CrearParametros.GetData("numeroDeCuenta", item.GetValue("NUMCTAD").Trim(), true));
+                        registro.DataList.Add(CrearParametros.GetData("valBancoDestino", item.GetValue("BCODES").Trim(), true));
+                        registro.DataList.Add(CrearParametros.GetData("descripcion", item.GetValue("VALEST").Trim(), true));
+                        registro.DataList.Add(CrearParametros.GetData("valFechaHoraCreacion", item.GetValue("FCHFAVCR").Trim(), true));
+                        registro.DataList.Add(CrearParametros.GetData("codMoneda", item.GetValue("CODMOND").Trim(), true));
+                        registro.DataList.Add(CrearParametros.GetData("alias", item.GetValue("VALALIAS").Trim(), true));
+                        registro.DataList.Add(CrearParametros.GetData("nombreCliente", item.GetValue("NOMTIT").Trim(), true));
+                        registro.DataList.Add(CrearParametros.GetData("numeroDeIdentificacionCuenta", item.GetValue("NUMIDED").Trim(), true));
+                        registro.DataList.Add(CrearParametros.GetData("valCuentaOrigen", item.GetValue("NUMCTAO").Trim(), true));
+                        registro.DataList.Add(CrearParametros.GetData("codTipoTransaccion", item.GetValue("CODTIPTRN").Trim(), true));
+                        registro.DataList.Add(CrearParametros.GetData("guid", item.GetValue("GUIDCTFV").Trim(), true));
+                        registro.DataList.Add(CrearParametros.GetData("tipoCtaDestino", item.GetValue("TIPCTAFD").Trim(), true));
+                        registro.DataList.Add(CrearParametros.GetData("tipoCtaOrigen", item.GetValue("TIPCTAFO").Trim(), true));
+                        registro.DataList.Add(CrearParametros.GetData("monedaOrigen", item.GetValue("CODMONO").Trim(), true));
+                        
+
+
+                        var cybi0060cl = new CYBI0060CL();
+                        /*foreach (string key in diccionary.Keys)
+                        {
+                            string value = item.GetValue(key);
+                            string field = diccionary[key];
+                            Data itemData = new Data()
+                            {
+                                HasData = value != "" ? true : false,
+                                Field = field,
+                                Value = value
+                            };
+                            
+
+
+                            switch (field)
+                            {
+                                case "tipoCtaDestino":
+                                    cybi0060cl.SetValue("codTipoCuentaDestino", value);
+                                    break;
+                                case "codTipoTransaccion":
+                                    cybi0060cl.SetValue("tipoCtaDestino", value);
+                                    break;
+                                case "monedaOrigen":
+                                    cybi0060cl.SetValue("monedaOrigen", value);
+                                    break;
+
+                                case "tipoProductoDestino":
+                                    cybi0060cl.SetValue("tipoProductoDestino", value);
+                                    break;
+                                case "valCuentaOrigen":
+                                    cybi0060cl.SetValue("valCuentaOrigen", value);
+                                    break;
+                                case "tipoCtaOrigen":
+                                    cybi0060cl.SetValue("tipoCtaOrigen", value);
+                                    break;
+                            }
+                            registro.DataList.Add(itemData);
+                        }*/
+                        //correos
+                        temp = (from item1 in temp
+                                where item1.GetValue("GUIDCOR") == gid1
+                                select item1).ToList();
+
+                        Data Emails = new Data()
+                        {
+                            HasData = true,
+                            Field = "Emails",
+                            DataList = new List<Data>()
+                        };
+                        
+                        foreach (EasyMappingTool cor in temp)
+                        {
+                            Data Email = new Data()
+                            {
+                                HasData = true,
+                                Field = "Email",
+                                DataList = new List<Data>()
+                            };
+
+                            Data valEmail = new Data()
+                            {
+                                HasData = true,
+                                Field = "valEmail",
+                                Value = cor.GetValue("FAVMAIL").ToString()
+                            };
+                            Email.DataList.Add(valEmail);
+                            Emails.DataList.Add(Email);
+                        }
+                        
+                        registro.DataList.Add(Emails); 
+                        /*if (diccionary.Count > 1)
+                        {
+                            DataMissing(registro, true);
+                        }*/
+                        PropiedadesAdicionales props = new PropiedadesAdicionales(cybi0060cl);
+                        registro.DataList.Add(props.GetProps2(item));
+                        lista.DataList.Add(registro);
+                    }
+                }
+            }
+            cant = index;
+            return lista;
+
+        }
