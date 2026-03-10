@@ -1,163 +1,183 @@
-using EasyTemplateSolution.Domain.Dto;
-using SUNITP.LIB.ManagerProcedures;
-using System.Collections.Generic;
-
-namespace Infrastructure.Helpers
-{
-    public class PropiedadesAdicionales
-    {
-        public List<string> _values;
-        public EasyMappingTool _cybi0060cl;
-        public PropiedadesAdicionales(EasyMappingTool cybi0060cl)
-        {
-            this._cybi0060cl = cybi0060cl;
-        }
-
-        public Data GetProps()
-        {
-            //Familia, Tipo de producto, grupo, codigo
-            var codTipoCuentaDestino = _cybi0060cl.GetValue("codTipoCuentaDestino");
-
-            Data Props = new Data()
+           //******************************************************************************************
+            if (cyb00035cl.GetValue("modoDeOperacion").Equals("2"))
             {
-                Field = "PropiedadesAdicionales",
-                DataList = new List<Data>()
-            };
-            var valCuentaOrigen = _cybi0060cl.GetValue("valCuentaOrigen");
-            Props.DataList.Add(GenProp("valCuentaOrigen", valCuentaOrigen));
+                //obteniendo cuenta
+                switch (codTipoCuentaDestino)
+                {
+                    case "P"://prestamos
+                        codTipoCuentaDestino = "50";
+                        break;
+                    case "S"://
+                        codTipoCuentaDestino = "60";
+                        break;
+                    case "T"://Tarjetas de credito
+                        codTipoCuentaDestino = "89";
+                        break;
+                    case "G"://Seguros
+                        codTipoCuentaDestino = "G";
+                        break;
+                    default://todos los productos 
+                        codTipoCuentaDestino = "A";
+                        break;
+                }
 
-            if (codTipoCuentaDestino.Trim() == "1")
-            {
-                Props.DataList.Add(GenProp("familia", "CTAS"));
-                Props.DataList.Add(GenProp("grupo", "CTA01"));
-                Props.DataList.Add(GenProp("codigoProducto", "1"));
-            }
-            else if (codTipoCuentaDestino.Trim() == "6")
-            {
-                Props.DataList.Add(GenProp("familia", "CTAS"));
-                Props.DataList.Add(GenProp("grupo", "CTA02"));
-                Props.DataList.Add(GenProp("codigoProducto", "6"));
-            }
-            else
-            {
-                Props.DataList.Add(GenProp("familia", "CTAS"));
-                Props.DataList.Add(GenProp("grupo", "CTA03"));
-                Props.DataList.Add(GenProp("codigoProducto", codTipoCuentaDestino));
-            }
+                //EasyParameter TiXCtaFD = CrearParametros.CreateEasyParameter("TiXCtaFD", ParameterDirection.Input, codTipoCuentaDestino, OleDbType.Char, 100, 0);
+                //EasyParameter CTipTrn = CrearParametros.CreateEasyParameter("CTipTrn", ParameterDirection.Input, codTipoTransaccion, OleDbType.VarChar, 20, 0);
+                EasyParameter NuXIdeO = CrearParametros.CreateEasyParameter("NuXIdeO", ParameterDirection.Input, numeroIdentificacion, OleDbType.Char, 100, 0);
+                string tipo = codTipoCuentaDestino == "G" ? "TIXCTAFO" : "TIXCTAFD";
+                EasyParameter TIXCTAFD = CrearParametros.CreateEasyParameter(tipo, ParameterDirection.Input, codTipoCuentaDestino, OleDbType.Char, 100, 0);
+                ServiceQueryStringGenerator sqs = new ServiceQueryStringGenerator();
+                sqs._iQueryStringGenerator.From("CYBERDTA", "ITCYBFAV");
+                // sqs._iQueryStringGenerator.WhereAnd(TiXCtaFD, "=");
+                // sqs._iQueryStringGenerator.WhereAnd(CTipTrn, "=");
+                if (!codTipoCuentaDestino.Equals("A"))
+                {
+                    sqs._iQueryStringGenerator.WhereAnd(TIXCTAFD, "=");
+                }
+                sqs._iQueryStringGenerator.WhereAnd(NuXIdeO, "=");
+                sqs._iQueryStringGenerator.OrderByDesc("TIXCTAFD");
+                sqs._iQueryStringGenerator.SelectAll();
+                EasyCrudDataModels ecdmRespon = new EasyCrudDataModels(_oledbConnection);
+                List<EasyMappingTool> registrosQueryResult = ecdmRespon.SelectExecute(sqs);
 
-            var monedaOrigen = _cybi0060cl.GetValue("monedaOrigen");
-            Props.DataList.Add(GenProp("monedaOrigen", monedaOrigen));
 
-            var tipoCtaDestino = _cybi0060cl.GetValue("tipoCtaDestino");
-            Props.DataList.Add(GenProp("tipoCtaDestino", tipoCtaDestino));
+                Data Registros = CrearParametros.GetData2("Registros", "0", "", true);
+                int i = 1;
+                var archivoContinuacion = cyb00035cl.GetValue("registroSiguiente");
+                archivoContinuacion = (archivoContinuacion.Trim() == "") ? "0" : archivoContinuacion;
+                var cant = 0;
+                var inicio = int.Parse(archivoContinuacion);
+                int final = inicio + 255;//to-do Jose Leon limit y offset en la quiery a generar sedebera de establecer el limit y offset para pdoer mandar la paginacion al as400 y evitar recorrer
+                string seguro;
 
-            var tipoProductoDestino = _cybi0060cl.GetValue("codTipoCuentaDestino");
-            Props.DataList.Add(GenProp("tipoProductoDestino", tipoProductoDestino));
-
-            var tipoCtaOrigen = _cybi0060cl.GetValue("tipoCtaOrigen");
-            Props.DataList.Add(GenProp("tipoCtaOrigen", tipoCtaOrigen));
-
-            return Props;
-        }
-
-        public Data GenProp(string valNombre, string valValor)
-        {
-
-            Data propiedadAdicional = new Data
-            {
-                HasData = true,
-                Field = "PropiedadAdicional",
-                DataList = new List<Data>()
-            };
-
-            Data DtoValNombre = new Data
-            {
-                Field = "valNombre",
-                HasData = true,
-                Value = valNombre
-            };
-
-            Data DtoValValor = new Data
-            {
-                Field = "valValor",
-                HasData = true,
-                Value = valValor
-            };
-            propiedadAdicional.DataList.Add(DtoValNombre);
-            propiedadAdicional.DataList.Add(DtoValValor);
-
-            return propiedadAdicional;
-
-        }
-        //Porpiedades Adicionales Para seguros 
-        public Data AdicionalesSeguros()
-        {
-            Data PAdicionales = new Data()
-            {
-                Field = "PropiedadesAdicionales",
-                DataList = new List<Data>()
-            };
-            PAdicionales.DataList.Add(GenProp("tipo seguro", _cybi0060cl.GetValue("TIXCTAFD").ToString().Trim()));
-            PAdicionales.DataList.Add(GenProp("POLIZA", _cybi0060cl.GetValue("NUXCTAD").ToString().Trim()));
-            PAdicionales.DataList.Add(GenProp("Expediente", _cybi0060cl.GetValue("COXBCO").ToString().Trim()));
-            PAdicionales.DataList.Add(GenProp("valCuentaOrigen", _cybi0060cl.GetValue("NUXCTAO").ToString().Trim()));
-            PAdicionales.DataList.Add(GenProp("monedaOrigen", _cybi0060cl.GetValue("COXMONO").ToString().Trim()));
-            PAdicionales.DataList.Add(GenProp("tipoProducto", _cybi0060cl.GetValue("TIXCTAFD").ToString().Trim()));
-
-            return PAdicionales;
-        }
+ if (!registrosQueryResult.Count.Equals(0)) // to-do Jose Leon, invertir este if para hacer el flujo limpio 
+                {
+                    foreach (EasyMappingTool registro in registrosQueryResult)
+                    {
 
 
 
 
-        public Data GetProps2(EasyMappingTool item)
-        {
-            //Familia, Tipo de producto, grupo, codigo
-            var codTipoCuentaDestino = item.GetValue("TIPCTAFD").ToString();
+                        var cybi0060cl = new CYBI0060CL();
+                        if (i >= inicio && i <= final)
+                        {
 
-            Data Props = new Data()
-            {
-                Field = "PropiedadesAdicionales",
-                DataList = new List<Data>()
-            };
-            var valCuentaOrigen = item.GetValue("NUMCTAO");
-            Props.DataList.Add(GenProp("valCuentaOrigen", valCuentaOrigen));
 
-            if (codTipoCuentaDestino.Trim() == "1")
-            {
-                Props.DataList.Add(GenProp("familia", "CTAS"));
-                Props.DataList.Add(GenProp("grupo", "CTA01"));
-                Props.DataList.Add(GenProp("codigoProducto", "1"));
-            }
-            else if (codTipoCuentaDestino.Trim() == "6")
-            {
-                Props.DataList.Add(GenProp("familia", "CTAS"));
-                Props.DataList.Add(GenProp("grupo", "CTA02"));
-                Props.DataList.Add(GenProp("codigoProducto", "6"));
-            }
-            else
-            {
-                Props.DataList.Add(GenProp("familia", "CTAS"));
-                Props.DataList.Add(GenProp("grupo", "CTA03"));
-                Props.DataList.Add(GenProp("codigoProducto", codTipoCuentaDestino));
-            }
 
-            var monedaOrigen = item.GetValue("CODMONO");
-            Props.DataList.Add(GenProp("monedaOrigen", monedaOrigen));
+                            Data Registro = CrearParametros.GetData2("Registro", i.ToString(), "", true);
+                            seguro = registro.GetValue("TIXCTAFO").Trim().ToString();
+                            Dictionary<string, string> tipoo = seguro == "G" ?
+                                TableDictionaries.ProductosGS() :
+                                TableDictionaries.ProductosTP(); //to-do Jose Leon corregir este antipatron con decoradores de las tablas que se consumen. desplegar la funcion para mas ejemplo
 
-            var tipoCtaDestino = item.GetValue("CODTIPTRN");
-            Props.DataList.Add(GenProp("tipoCtaDestino", tipoCtaDestino));
 
-            var tipoProductoDestino = item.GetValue("TIPCTAFD");
-            Props.DataList.Add(GenProp("tipoProductoDestino", tipoProductoDestino));
 
-            var tipoCtaOrigen = item.GetValue("TIPCTAFO");
-            Props.DataList.Add(GenProp("tipoCtaOrigen", tipoCtaOrigen));
 
-            return Props;
-        }
-    }
+
+                            foreach (KeyValuePair<string, string> item in tipoo)
+                            {
+                                string field = item.Value;
+                                string value = registro.GetValue(item.Key);
+                                switch (field)
+                                {
+                                    case "tipoCtaDestino":
+                                        cybi0060cl.SetValue("codTipoCuentaDestino", value);
+                                        break;
+                                    case "codTipoTransaccion":
+                                        cybi0060cl.SetValue("tipoCtaDestino", value);
+                                        break;
+                                    case "monedaOrigen":
+                                        cybi0060cl.SetValue("monedaOrigen", value);
+                                        break;
+
+                                    case "tipoProductoDestino":
+                                        cybi0060cl.SetValue("tipoProductoDestino", value);
+                                        break;
+                                    case "valCuentaOrigen":
+                                        cybi0060cl.SetValue("valCuentaOrigen", value);
+                                        break;
+                                    case "tipoCtaOrigen":
+                                        cybi0060cl.SetValue("tipoCtaOrigen", value);
+                                        break;
+                                }
+                                Registro.DataList.Add(CrearParametros.GetData(field.Trim(), value.Trim()));
+
+                            }
+
+                            i++;
+                            if (seguro == "G")
+                            {
+                                PropiedadesAdicionales props = new PropiedadesAdicionales(registro);
+                                Registro.DataList.Add(props.AdicionalesSeguros());
+                                Registros.DataList.Add(Registro);
+                            }
+                            else
+                            {
+                                PropiedadesAdicionales props = new PropiedadesAdicionales(cybi0060cl);
+                                Registro.DataList.Add(props.GetProps());
+                                Registros.DataList.Add(Registro);
+                            }
+
+                        }
+
+                    }
+                }
+                else
+                {
+                    cyb00035cl.SetValue("codMsgRespuesta", "180306");//"180306"); //211
+                    cyb00035cl.SetValue("msgRespuesta", "No posee productos inscritos para esta funcionalidad"); //"Actualmente no tiene inscritos que le permitan usar esta opción.");//No posee productos inscritos para esta funcionalidad
+                    cyb00035cl.SetValue("caracterAceptacion", "M");
+                }
+
+
+                //to-do Jose Leon 
+                // if registrosQueryResult.Count.Equals(0) 
+                //      return error de negocio...
+                //si no es vacio el proceso normal de transformacion de datos.
+
+
+                if (archivoContinuacion.Trim() == "") { archivoContinuacion = "0"; }
+                if (archivoContinuacion.Trim() == "0")
+                {
+                    if (cant > 250)
+                    {
+                        cyb00035cl.SetValue("archivoContinuacion", "251");
+                        cyb00035cl.SetValue("valTalonRegistroAnterior", "0");
+
+                    }
+                    else
+                    {
+                        cyb00035cl.SetValue("archivoContinuacion", "0");
+                        cyb00035cl.SetValue("valTalonRegistroAnterior", "0");
+                    }
+                    cyb00035cl.SetValue("cantidadRegistros", cant.ToString());
+
+                }
+                else
+                {
+                    var cantRegistros = cant - inicio;
+                    cyb00035cl.SetValue("cantidadRegistros", cantRegistros.ToString());
+                    var valArchivoContinuacion = int.Parse(archivoContinuacion);
+                    if ((cant - inicio) > 250)
+                    {
+                        cyb00035cl.SetValue("valTalonRegistroAnterior", valArchivoContinuacion.ToString());
+                        valArchivoContinuacion = valArchivoContinuacion + 250;
+                        cyb00035cl.SetValue("archivoContinuacion", valArchivoContinuacion.ToString().Trim());
+                    }
+                    else
+                    {
+                        cyb00035cl.SetValue("archivoContinuacion", "0");
+                        valArchivoContinuacion = (valArchivoContinuacion - 250 == 1) ? 0 : (valArchivoContinuacion - 250);
+
+                        cyb00035cl.SetValue("valTalonRegistroAnterior", valArchivoContinuacion.ToString());
+
+                    }
+                }
+
+                var rdm = new ResponseDataMapper("", "RESPONSE", "", "00000000000000000000", "PROCESO REALIZADO EXITOSAMENTE", "");
+                dataResponse = rdm.Map(cyb00035cl);
+
+                dataResponse.DataList.Add(Registros);
+
+
 }
-
-
-
