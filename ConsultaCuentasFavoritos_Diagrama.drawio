@@ -1,0 +1,346 @@
+<mxfile host="app.diagrams.net" modified="2026-03-11" agent="Claude" type="device">
+  <diagram id="ms35-flow" name="ConsultaCuentasFavoritos">
+    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- ══════════════════════════════════════ -->
+        <!-- HEADER -->
+        <!-- ══════════════════════════════════════ -->
+        <mxCell id="title" value="MS35 — ConsultaCuentasFavoritos" style="text;html=1;fontSize=18;fontStyle=1;fontFamily=Helvetica;fontColor=#2D3748;align=center;" vertex="1" parent="1">
+          <mxGeometry x="540" y="20" width="400" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle" value=".NET 10  ·  LinqForge + Dapper  ·  DB2/400 ODBC" style="text;html=1;fontSize=11;fontFamily=Helvetica;fontColor=#A0AEC0;align=center;" vertex="1" parent="1">
+          <mxGeometry x="540" y="50" width="400" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- ══════════════════════════════════════ -->
+        <!-- ENTRADA -->
+        <!-- ══════════════════════════════════════ -->
+        <mxCell id="start" value="DoExecute(dataRequest, requestId)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2D3748;fontColor=#FFFFFF;strokeColor=#2D3748;fontSize=12;fontStyle=1;fontFamily=Helvetica;arcSize=50;" vertex="1" parent="1">
+          <mxGeometry x="600" y="90" width="280" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="mapReq" value="MapFromRequest&lt;CYB00035LC&gt;(dataRequest)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#CBD5E0;fontSize=11;fontFamily=Helvetica;fontColor=#2D3748;" vertex="1" parent="1">
+          <mxGeometry x="600" y="155" width="280" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="e_start_map" style="endArrow=block;endFill=1;strokeColor=#718096;strokeWidth=1.5;" edge="1" parent="1" source="start" target="mapReq">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="jt400" value="JT400 → AS400&#xa;CallProgramAsync(cyb00035lc)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EBF4FF;strokeColor=#90CDF4;fontSize=11;fontFamily=Helvetica;fontColor=#2A4365;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="600" y="216" width="280" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="e_map_jt" style="endArrow=block;endFill=1;strokeColor=#718096;strokeWidth=1.5;" edge="1" parent="1" source="mapReq" target="jt400">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="extract" value="Extraer variables: codTipoCuentaDestino, numeroIdentificacion, canal, filtros" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#CBD5E0;fontSize=10;fontFamily=Helvetica;fontColor=#4A5568;" vertex="1" parent="1">
+          <mxGeometry x="580" y="283" width="320" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="e_jt_ext" style="endArrow=block;endFill=1;strokeColor=#718096;strokeWidth=1.5;" edge="1" parent="1" source="jt400" target="extract">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ══════════════════════════════════════ -->
+        <!-- DECISION PRINCIPAL -->
+        <!-- ══════════════════════════════════════ -->
+        <mxCell id="checkModo" value="ModoDeOperacion?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FEFCBF;strokeColor=#D69E2E;fontSize=11;fontStyle=1;fontFamily=Helvetica;fontColor=#744210;aspect=auto;" vertex="1" parent="1">
+          <mxGeometry x="660" y="344" width="160" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="e_ext_modo" style="endArrow=block;endFill=1;strokeColor=#718096;strokeWidth=1.5;" edge="1" parent="1" source="extract" target="checkModo">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ══════════════════════════════════════ -->
+        <!-- RAMA IZQUIERDA: MODO 2 (TCYBFAV) -->
+        <!-- ══════════════════════════════════════ -->
+        <mxCell id="labelM2" value="MODO 2 — TCYBFAV" style="text;html=1;fontSize=10;fontStyle=1;fontFamily=Helvetica;fontColor=#5A67D8;align=center;" vertex="1" parent="1">
+          <mxGeometry x="140" y="370" width="160" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="m2tipo" value="TipoCuentaMapper.Mapear()&#xa;P→50 · S→60 · T→89 · G→G · default→A" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#CBD5E0;fontSize=10;fontFamily=Helvetica;fontColor=#4A5568;" vertex="1" parent="1">
+          <mxGeometry x="120" y="400" width="260" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="e_modo_m2" value="== 2" style="endArrow=block;endFill=1;strokeColor=#5A67D8;strokeWidth=1.5;fontFamily=Helvetica;fontSize=10;fontColor=#5A67D8;fontStyle=1;" edge="1" parent="1" source="checkModo" target="m2tipo">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="m2query" value="BuildQueryModo2()&#xa;QueryBuilder&lt;TCYBFAV&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EBF4FF;strokeColor=#90CDF4;fontSize=11;fontFamily=Helvetica;fontColor=#2A4365;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="140" y="465" width="220" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="e_m2t_q" style="endArrow=block;endFill=1;strokeColor=#718096;strokeWidth=1.5;" edge="1" parent="1" source="m2tipo" target="m2query">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="m2filtro" value="codTipoCuenta?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FEFCBF;strokeColor=#D69E2E;fontSize=10;fontStyle=1;fontFamily=Helvetica;fontColor=#744210;" vertex="1" parent="1">
+          <mxGeometry x="175" y="530" width="150" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="e_m2q_f" style="endArrow=block;endFill=1;strokeColor=#718096;strokeWidth=1.5;" edge="1" parent="1" source="m2query" target="m2filtro">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="m2todos" value="Solo NumeroIdentidadOrigen" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EBF4FF;strokeColor=#90CDF4;fontSize=9;fontFamily=Helvetica;fontColor=#2A4365;" vertex="1" parent="1">
+          <mxGeometry x="20" y="610" width="150" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="m2seg" value="+ TipoCuentaOrigen = G" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EBF4FF;strokeColor=#90CDF4;fontSize=9;fontFamily=Helvetica;fontColor=#2A4365;" vertex="1" parent="1">
+          <mxGeometry x="180" y="610" width="140" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="m2otro" value="+ TipoCuentaDestino = codigo" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EBF4FF;strokeColor=#90CDF4;fontSize=9;fontFamily=Helvetica;fontColor=#2A4365;" vertex="1" parent="1">
+          <mxGeometry x="330" y="610" width="160" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="e_f_todos" value="A" style="endArrow=block;endFill=1;strokeColor=#718096;strokeWidth=1;fontSize=9;fontColor=#718096;" edge="1" parent="1" source="m2filtro" target="m2todos">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_f_seg" value="G" style="endArrow=block;endFill=1;strokeColor=#718096;strokeWidth=1;fontSize=9;fontColor=#718096;" edge="1" parent="1" source="m2filtro" target="m2seg">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_f_otro" value="otro" style="endArrow=block;endFill=1;strokeColor=#718096;strokeWidth=1;fontSize=9;fontColor=#718096;" edge="1" parent="1" source="m2filtro" target="m2otro">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="m2exec" value="ODBC + Dapper&#xa;QueryAsync&lt;TCYBFAV&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EBF4FF;strokeColor=#90CDF4;fontSize=10;fontFamily=Helvetica;fontColor=#2A4365;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="155" y="665" width="190" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="e_t_exec" style="endArrow=block;endFill=1;strokeColor=#718096;strokeWidth=1;" edge="1" parent="1" source="m2todos" target="m2exec">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_s_exec" style="endArrow=block;endFill=1;strokeColor=#718096;strokeWidth=1;" edge="1" parent="1" source="m2seg" target="m2exec">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_o_exec" style="endArrow=block;endFill=1;strokeColor=#718096;strokeWidth=1;" edge="1" parent="1" source="m2otro" target="m2exec">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="m2valid" value="Hay registros?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FEFCBF;strokeColor=#D69E2E;fontSize=10;fontStyle=1;fontFamily=Helvetica;fontColor=#744210;" vertex="1" parent="1">
+          <mxGeometry x="185" y="726" width="130" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="e_exec_val2" style="endArrow=block;endFill=1;strokeColor=#718096;strokeWidth=1.5;" edge="1" parent="1" source="m2exec" target="m2valid">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="m2err" value="Error 180306&#xa;No posee productos" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF5F5;strokeColor=#FC8181;fontSize=10;fontFamily=Helvetica;fontColor=#C53030;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="20" y="734" width="140" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="e_val2_err" value="No" style="endArrow=block;endFill=1;strokeColor=#FC8181;strokeWidth=1;dashed=1;fontSize=9;fontColor=#C53030;" edge="1" parent="1" source="m2valid" target="m2err">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="m2pag" value="Paginación Skip/Take — 255" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#CBD5E0;fontSize=10;fontFamily=Helvetica;fontColor=#4A5568;" vertex="1" parent="1">
+          <mxGeometry x="155" y="806" width="190" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="e_val2_pag" value="Sí" style="endArrow=block;endFill=1;strokeColor=#718096;strokeWidth=1.5;fontSize=9;fontColor=#718096;" edge="1" parent="1" source="m2valid" target="m2pag">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="m2map" value="MapearRegistrosModo2()" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FAF5FF;strokeColor=#B794F4;fontSize=10;fontFamily=Helvetica;fontColor=#553C9A;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="155" y="856" width="190" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="e_pag2_map" style="endArrow=block;endFill=1;strokeColor=#718096;strokeWidth=1.5;" edge="1" parent="1" source="m2pag" target="m2map">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="m2seguro" value="Es seguro?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FEFCBF;strokeColor=#D69E2E;fontSize=10;fontStyle=1;fontFamily=Helvetica;fontColor=#744210;" vertex="1" parent="1">
+          <mxGeometry x="190" y="908" width="120" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="e_map2_seg" style="endArrow=block;endFill=1;strokeColor=#718096;strokeWidth=1.5;" edge="1" parent="1" source="m2map" target="m2seguro">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="m2propSeg" value="GenerarPropiedades&#xa;Seguros()" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FAF5FF;strokeColor=#B794F4;fontSize=9;fontFamily=Helvetica;fontColor=#553C9A;" vertex="1" parent="1">
+          <mxGeometry x="80" y="975" width="130" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="m2propProd" value="GenerarPropiedades&#xa;Producto()" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FAF5FF;strokeColor=#B794F4;fontSize=9;fontFamily=Helvetica;fontColor=#553C9A;" vertex="1" parent="1">
+          <mxGeometry x="290" y="975" width="130" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="e_seg_ps" value="G" style="endArrow=block;endFill=1;strokeColor=#718096;strokeWidth=1;fontSize=9;fontColor=#718096;" edge="1" parent="1" source="m2seguro" target="m2propSeg">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_seg_pp" value="otro" style="endArrow=block;endFill=1;strokeColor=#718096;strokeWidth=1;fontSize=9;fontColor=#718096;" edge="1" parent="1" source="m2seguro" target="m2propProd">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="m2resp" value="MapToResponse + DataList" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F0FFF4;strokeColor=#68D391;fontSize=10;fontFamily=Helvetica;fontColor=#276749;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="140" y="1036" width="220" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="e_ps_r" style="endArrow=block;endFill=1;strokeColor=#718096;strokeWidth=1;" edge="1" parent="1" source="m2propSeg" target="m2resp">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_pp_r" style="endArrow=block;endFill=1;strokeColor=#718096;strokeWidth=1;" edge="1" parent="1" source="m2propProd" target="m2resp">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ══════════════════════════════════════ -->
+        <!-- RAMA DERECHA: ELSE (CYBFAV) -->
+        <!-- ══════════════════════════════════════ -->
+        <mxCell id="labelElse" value="ELSE — CYBFAV" style="text;html=1;fontSize=10;fontStyle=1;fontFamily=Helvetica;fontColor=#5A67D8;align=center;" vertex="1" parent="1">
+          <mxGeometry x="830" y="370" width="140" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="equery" value="BuildQuery()&#xa;QueryBuilder&lt;CYBFAV&gt;&#xa;Filtros dinámicos .Where() encadenados" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EBF4FF;strokeColor=#90CDF4;fontSize=10;fontFamily=Helvetica;fontColor=#2A4365;" vertex="1" parent="1">
+          <mxGeometry x="780" y="400" width="250" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="e_modo_else" value="else" style="endArrow=block;endFill=1;strokeColor=#5A67D8;strokeWidth=1.5;fontFamily=Helvetica;fontSize=10;fontColor=#5A67D8;fontStyle=1;" edge="1" parent="1" source="checkModo" target="equery">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="efiltros" value="WHERE NumeroIdentidadOrigen = ?&#xa;AND BancoDestino ≠ vacío&#xa;+ opcionales: NombreTitular, Alias, CuentaDestino, CuentaACH" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EBF4FF;strokeColor=#90CDF4;fontSize=9;fontFamily=Helvetica;fontColor=#2A4365;" vertex="1" parent="1">
+          <mxGeometry x="770" y="475" width="270" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="e_eq_ef" style="endArrow=block;endFill=1;strokeColor=#718096;strokeWidth=1.5;" edge="1" parent="1" source="equery" target="efiltros">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="eexec" value="ODBC + Dapper&#xa;QueryAsync&lt;CYBFAV&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EBF4FF;strokeColor=#90CDF4;fontSize=10;fontFamily=Helvetica;fontColor=#2A4365;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="810" y="550" width="190" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="e_ef_ex" style="endArrow=block;endFill=1;strokeColor=#718096;strokeWidth=1.5;" edge="1" parent="1" source="efiltros" target="eexec">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ecanal" value="canal == 4?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FEFCBF;strokeColor=#D69E2E;fontSize=10;fontStyle=1;fontFamily=Helvetica;fontColor=#744210;" vertex="1" parent="1">
+          <mxGeometry x="845" y="611" width="120" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="e_ex_can" style="endArrow=block;endFill=1;strokeColor=#718096;strokeWidth=1.5;" edge="1" parent="1" source="eexec" target="ecanal">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ededup" value="Deduplicación Canal 4&#xa;GroupBy + OrderByDesc + First()" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#CBD5E0;fontSize=9;fontFamily=Helvetica;fontColor=#4A5568;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="616" width="190" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="e_can_ded" value="Sí" style="endArrow=block;endFill=1;strokeColor=#718096;strokeWidth=1;fontSize=9;fontColor=#718096;" edge="1" parent="1" source="ecanal" target="ededup">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ecorreos" value="Consultar correos CYBFAVC&#xa;Pre-agrupar en Dictionary&lt;GUID, List&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EBF4FF;strokeColor=#90CDF4;fontSize=10;fontFamily=Helvetica;fontColor=#2A4365;" vertex="1" parent="1">
+          <mxGeometry x="790" y="690" width="230" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="e_can_cor" value="No" style="endArrow=block;endFill=1;strokeColor=#718096;strokeWidth=1;fontSize=9;fontColor=#718096;" edge="1" parent="1" source="ecanal" target="ecorreos">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_ded_cor" style="endArrow=block;endFill=1;strokeColor=#718096;strokeWidth=1;" edge="1" parent="1" source="ededup" target="ecorreos">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="efiltipo" value="Filtrar por codTipoCuentaDestino&#xa;T = todos pasan · otro = solo coincidentes" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#CBD5E0;fontSize=9;fontFamily=Helvetica;fontColor=#4A5568;" vertex="1" parent="1">
+          <mxGeometry x="790" y="755" width="230" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="e_cor_ft" style="endArrow=block;endFill=1;strokeColor=#718096;strokeWidth=1.5;" edge="1" parent="1" source="ecorreos" target="efiltipo">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="evalid" value="Hay registros?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FEFCBF;strokeColor=#D69E2E;fontSize=10;fontStyle=1;fontFamily=Helvetica;fontColor=#744210;" vertex="1" parent="1">
+          <mxGeometry x="840" y="816" width="130" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="e_ft_val" style="endArrow=block;endFill=1;strokeColor=#718096;strokeWidth=1.5;" edge="1" parent="1" source="efiltipo" target="evalid">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="eerr" value="Error 180306&#xa;No posee productos" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF5F5;strokeColor=#FC8181;fontSize=10;fontFamily=Helvetica;fontColor=#C53030;" vertex="1" parent="1">
+          <mxGeometry x="1050" y="824" width="140" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="e_val_err" value="No" style="endArrow=block;endFill=1;strokeColor=#FC8181;strokeWidth=1;dashed=1;fontSize=9;fontColor=#C53030;" edge="1" parent="1" source="evalid" target="eerr">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="epag" value="Paginación Skip/Take — 250" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#CBD5E0;fontSize=10;fontFamily=Helvetica;fontColor=#4A5568;" vertex="1" parent="1">
+          <mxGeometry x="810" y="896" width="190" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="e_val_pag" value="Sí" style="endArrow=block;endFill=1;strokeColor=#718096;strokeWidth=1.5;fontSize=9;fontColor=#718096;" edge="1" parent="1" source="evalid" target="epag">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="emap" value="MapearRegistros()&#xa;+ MapearCorreos() — O(1)&#xa;+ GenerarPropiedadesAdicionales()" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FAF5FF;strokeColor=#B794F4;fontSize=10;fontFamily=Helvetica;fontColor=#553C9A;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="790" y="951" width="230" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="e_pag_map" style="endArrow=block;endFill=1;strokeColor=#718096;strokeWidth=1.5;" edge="1" parent="1" source="epag" target="emap">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="eresp" value="MapToResponse + DataList" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F0FFF4;strokeColor=#68D391;fontSize=10;fontFamily=Helvetica;fontColor=#276749;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="810" y="1026" width="190" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="e_map_resp" style="endArrow=block;endFill=1;strokeColor=#718096;strokeWidth=1.5;" edge="1" parent="1" source="emap" target="eresp">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ══════════════════════════════════════ -->
+        <!-- FIN -->
+        <!-- ══════════════════════════════════════ -->
+        <mxCell id="fin" value="return dataResponse" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2D3748;fontColor=#FFFFFF;strokeColor=#2D3748;fontSize=12;fontStyle=1;fontFamily=Helvetica;arcSize=50;" vertex="1" parent="1">
+          <mxGeometry x="550" y="1100" width="380" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e_m2r_fin" style="endArrow=block;endFill=1;strokeColor=#68D391;strokeWidth=1.5;" edge="1" parent="1" source="m2resp" target="fin">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_er_fin" style="endArrow=block;endFill=1;strokeColor=#68D391;strokeWidth=1.5;" edge="1" parent="1" source="eresp" target="fin">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_m2err_fin" style="endArrow=block;endFill=1;strokeColor=#FC8181;strokeWidth=1;dashed=1;" edge="1" parent="1" source="m2err" target="fin">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_eerr_fin" style="endArrow=block;endFill=1;strokeColor=#FC8181;strokeWidth=1;dashed=1;" edge="1" parent="1" source="eerr" target="fin">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ══════════════════════════════════════ -->
+        <!-- LEYENDA -->
+        <!-- ══════════════════════════════════════ -->
+        <mxCell id="leg_title" value="Leyenda" style="text;html=1;fontSize=10;fontStyle=1;fontFamily=Helvetica;fontColor=#718096;" vertex="1" parent="1">
+          <mxGeometry x="1280" y="90" width="60" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="leg1" value="" style="rounded=0;fillColor=#EBF4FF;strokeColor=#90CDF4;" vertex="1" parent="1">
+          <mxGeometry x="1280" y="115" width="16" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="leg1t" value="Query DB2 / AS400" style="text;fontSize=9;fontFamily=Helvetica;fontColor=#4A5568;" vertex="1" parent="1">
+          <mxGeometry x="1302" y="115" width="110" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="leg2" value="" style="rounded=0;fillColor=#FAF5FF;strokeColor=#B794F4;" vertex="1" parent="1">
+          <mxGeometry x="1280" y="138" width="16" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="leg2t" value="Mapeo Data/DataList" style="text;fontSize=9;fontFamily=Helvetica;fontColor=#4A5568;" vertex="1" parent="1">
+          <mxGeometry x="1302" y="138" width="110" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="leg3" value="" style="rounded=0;fillColor=#FEFCBF;strokeColor=#D69E2E;" vertex="1" parent="1">
+          <mxGeometry x="1280" y="161" width="16" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="leg3t" value="Decisión" style="text;fontSize=9;fontFamily=Helvetica;fontColor=#4A5568;" vertex="1" parent="1">
+          <mxGeometry x="1302" y="161" width="110" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="leg4" value="" style="rounded=0;fillColor=#F0FFF4;strokeColor=#68D391;" vertex="1" parent="1">
+          <mxGeometry x="1280" y="184" width="16" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="leg4t" value="Respuesta exitosa" style="text;fontSize=9;fontFamily=Helvetica;fontColor=#4A5568;" vertex="1" parent="1">
+          <mxGeometry x="1302" y="184" width="110" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="leg5" value="" style="rounded=0;fillColor=#FFF5F5;strokeColor=#FC8181;" vertex="1" parent="1">
+          <mxGeometry x="1280" y="207" width="16" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="leg5t" value="Error de negocio" style="text;fontSize=9;fontFamily=Helvetica;fontColor=#4A5568;" vertex="1" parent="1">
+          <mxGeometry x="1302" y="207" width="110" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="leg6" value="" style="endArrow=block;endFill=1;strokeColor=#718096;strokeWidth=1.5;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1280" y="238" as="sourcePoint" />
+            <mxPoint x="1296" y="238" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="leg6t" value="Flujo normal" style="text;fontSize=9;fontFamily=Helvetica;fontColor=#4A5568;" vertex="1" parent="1">
+          <mxGeometry x="1302" y="230" width="110" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="leg7" value="" style="endArrow=block;endFill=1;strokeColor=#FC8181;strokeWidth=1;dashed=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1280" y="258" as="sourcePoint" />
+            <mxPoint x="1296" y="258" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="leg7t" value="Flujo de error" style="text;fontSize=9;fontFamily=Helvetica;fontColor=#4A5568;" vertex="1" parent="1">
+          <mxGeometry x="1302" y="250" width="110" height="16" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
